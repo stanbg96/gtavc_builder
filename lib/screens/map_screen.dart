@@ -20,10 +20,10 @@ class _MapScreenState extends State<MapScreen> {
   LatLng _center = const LatLng(42.6977, 23.3219);
   double _zoom = 16.0;
 
-  final TextEditingController _minLatController = TextEditingController(text: '42.6950');
-  final TextEditingController _minLonController = TextEditingController(text: '23.3180');
-  final TextEditingController _maxLatController = TextEditingController(text: '42.7000');
-  final TextEditingController _maxLonController = TextEditingController(text: '23.3250');
+  final TextEditingController _minLatController = TextEditingController(text: '42.01259');
+  final TextEditingController _minLonController = TextEditingController(text: '23.09503');
+  final TextEditingController _maxLatController = TextEditingController(text: '42.01408');
+  final TextEditingController _maxLonController = TextEditingController(text: '23.09703');
 
   TargetPlatformType _selectedPlatform = TargetPlatformType.android;
   TexturingMode _selectedTexturingMode = TexturingMode.aiSatellite;
@@ -31,24 +31,24 @@ class _MapScreenState extends State<MapScreen> {
   int _selectedVehicleId = 141;
   bool _isProcessing = false;
   double _progress = 0.0;
-  String _statusMessage = 'Изберете зона и натиснете "Генерирай GTA VC Файлове"';
+  String _statusMessage = 'Изберете зона от картата и натиснете бутона долу.';
   String? _publicExportPath;
 
   final Map<int, String> _vehicles = {
-    141: '🇪🇺 Ferrari Testarossa (Cheetah)',
-    236: '🇪🇺 Lamborghini Countach (Infernus)',
-    188: '🇪🇺 Porsche 911 Turbo (Comet)',
-    205: '🇪🇺 BMW M3 E30 / Alpina (Sentinel XS)',
-    138: '🇪🇺 Mercedes-Benz 560 SEC (Admiral)',
-    139: '🇪🇺 Ferrari Daytona (Stinger)',
-    135: '🇪🇺 Mercedes-Benz 190E (Sentinel)',
-    196: '🇯🇵 Honda CR-X / Civic (Blista Compact)',
+    141: '🏎️ Ferrari Testarossa (Cheetah)',
+    236: '🏎️ Lamborghini Countach (Infernus)',
+    188: '🏎️ Porsche 911 Turbo (Comet)',
+    205: '🏎️ BMW M3 E30 (Sentinel XS)',
+    138: '🏎️ Mercedes-Benz 560 SEC (Admiral)',
+    139: '🏎️ Ferrari Daytona (Stinger)',
+    135: '🏎️ Mercedes 190E (Sentinel)',
+    196: '🇯🇵 Honda CR-X (Blista Compact)',
     208: '🇯🇵 Toyota Supra Mk3 (Sabre Turbo)',
-    189: '🇯🇵 Mazda RX-7 Rotary (Deluxo)',
+    189: '🇯🇵 Mazda RX-7 (Deluxo)',
     130: '🇯🇵 Toyota Land Cruiser (Landstalker)',
-    191: '🇯🇵 Honda CBR / Suzuki (PCJ-600)',
-    198: '🇯🇵 Yamaha XT / Enduro (Sanchez)',
-    168: '🇯🇵 Honda Super Cub (Faggio)',
+    191: '🏍️ Honda CBR / Suzuki (PCJ-600)',
+    198: '🏍️ Yamaha Enduro (Sanchez)',
+    168: '🛵 Honda Super Cub (Faggio)',
     155: '🚁 Hunter Chopper',
   };
 
@@ -80,23 +80,23 @@ class _MapScreenState extends State<MapScreen> {
           children: [
             Icon(Icons.sports_esports, color: Color(0xFFFF007F)),
             SizedBox(width: 8),
-            Text('Как да пуснеш картата в GTA VC'),
+            Text('Инструкции за GTA VC', style: TextStyle(fontSize: 16)),
           ],
         ),
         content: const SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('1. Копирай генерираната папка в:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
-              Text('GTA Vice City/data/maps/osm/\n', style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
-              Text('2. Отвори data/gta_vc.dat и добави:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
+              Text('1. Копирай генерираната папка в:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan, fontSize: 13)),
+              Text('GTA Vice City/data/maps/osm/\n', style: TextStyle(fontFamily: 'monospace', fontSize: 11)),
+              Text('2. Отвори data/gta_vc.dat и добави:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan, fontSize: 13)),
               SelectableText(
                 'CDIMAGE DATA\\MAPS\\OSM\\OSM_MAP.IMG\nIDE DATA\\MAPS\\OSM\\OSM_WORLD.IDE\nIPL DATA\\MAPS\\OSM\\OSM_WORLD.IPL\nCOLFILE 0 DATA\\MAPS\\OSM\\OSM_WORLD.COL',
-                style: TextStyle(fontFamily: 'monospace', color: Colors.amber, fontSize: 11),
+                style: TextStyle(fontFamily: 'monospace', color: Colors.amber, fontSize: 10),
               ),
-              SizedBox(height: 12),
-              Text('3. Стартирай играта!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-              Text('Градът ще се зареди с избрания режим на текстури, коли и улично осветление!'),
+              SizedBox(height: 10),
+              Text('3. Стартирай играта!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent, fontSize: 13)),
+              Text('Картата и колата ще те чакат на координати X:0 Y:0 Z:15.', style: TextStyle(fontSize: 12)),
             ],
           ),
         ),
@@ -230,7 +230,7 @@ class _MapScreenState extends State<MapScreen> {
 
       setState(() {
         _progress = 1.0;
-        _statusMessage = ' Готово! Експортиран пълен GTA VC пакет ($fileCount файла):\n${publicDownloadDir.path}';
+        _statusMessage = ' Готово! Експортиран пълен пакет ($fileCount файла) в:\n${publicDownloadDir.path}';
       });
 
       if (await osmFile.exists()) await osmFile.delete();
@@ -250,252 +250,281 @@ class _MapScreenState extends State<MapScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('GTA VC Map Builder (OSM)'),
+        title: const Text('GTA VC Map Builder', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF1E1E28),
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.help_outline),
-            tooltip: 'Инструкции за инсталиране',
+            icon: const Icon(Icons.help_outline, color: Color(0xFF00F0FF)),
+            tooltip: 'Инструкции за играта',
             onPressed: _showInstallGuideDialog,
           ),
           IconButton(
-            icon: const Icon(Icons.crop_free),
+            icon: const Icon(Icons.crop_free, color: Color(0xFFFF007F)),
             tooltip: 'Вземи координати от екрана',
             onPressed: _isProcessing ? null : _updateBboxFromMap,
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            flex: 3,
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: _center,
-                initialZoom: _zoom,
-                onPositionChanged: (pos, hasGesture) {
-                  if (pos.center != null) _center = pos.center!;
-                  if (pos.zoom != null) _zoom = pos.zoom!;
-                },
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Компактна Карта
+            Container(
+              height: 180,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white12),
               ),
-              children: [
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.stanbg96.gtavc_builder',
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 4,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
                 children: [
-                  const Text('Режим на текстуриране:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  SegmentedButton<TexturingMode>(
-                    segments: const [
-                      ButtonSegment(value: TexturingMode.aiSatellite, label: Text('🛰️ AI Сателит')),
-                      ButtonSegment(value: TexturingMode.procedural32, label: Text('🏛️ 32 Материала')),
-                    ],
-                    selected: {_selectedTexturingMode},
-                    onSelectionChanged: _isProcessing
-                        ? null
-                        : (newSelection) {
-                            setState(() {
-                              _selectedTexturingMode = newSelection.first;
-                            });
-                          },
-                  ),
-                  const SizedBox(height: 10),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Целева платформа:', style: TextStyle(fontWeight: FontWeight.bold)),
-                      SegmentedButton<TargetPlatformType>(
-                        segments: const [
-                          ButtonSegment(value: TargetPlatformType.pc, label: Text('PC (D3D8)')),
-                          ButtonSegment(value: TargetPlatformType.android, label: Text('Android')),
-                        ],
-                        selected: {_selectedPlatform},
-                        onSelectionChanged: _isProcessing
-                            ? null
-                            : (newSelection) {
-                                setState(() {
-                                  _selectedPlatform = newSelection.first;
-                                });
-                              },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Стартова кола:', style: TextStyle(fontWeight: FontWeight.bold)),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF282836),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<int>(
-                            value: _selectedVehicleId,
-                            dropdownColor: const Color(0xFF282836),
-                            items: _vehicles.entries.map((e) {
-                              return DropdownMenuItem<int>(
-                                value: e.key,
-                                child: Text(e.value, style: const TextStyle(fontSize: 12, color: Color(0xFF00F0FF))),
-                              );
-                            }).toList(),
-                            onChanged: _isProcessing
-                                ? null
-                                : (val) {
-                                    if (val != null) setState(() => _selectedVehicleId = val);
-                                  },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('Улични лампи и палми (Props)', style: TextStyle(fontSize: 14)),
-                    subtitle: const Text('Поставя стълбове по улиците и палми в парковете', style: TextStyle(fontSize: 11, color: Colors.white54)),
-                    value: _enableProps,
-                    activeColor: const Color(0xFFFF007F),
-                    onChanged: _isProcessing ? null : (val) => setState(() => _enableProps = val),
-                  ),
-                  const SizedBox(height: 8),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _minLatController,
-                          enabled: !_isProcessing,
-                          decoration: const InputDecoration(labelText: 'Min Lat (Юг)', border: OutlineInputBorder()),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _minLonController,
-                          enabled: !_isProcessing,
-                          decoration: const InputDecoration(labelText: 'Min Lon (Запад)', border: OutlineInputBorder()),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _maxLatController,
-                          enabled: !_isProcessing,
-                          decoration: const InputDecoration(labelText: 'Max Lat (Север)', border: OutlineInputBorder()),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _maxLonController,
-                          enabled: !_isProcessing,
-                          decoration: const InputDecoration(labelText: 'Max Lon (Изток)', border: OutlineInputBorder()),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  if (_isProcessing) ...[
-                    LinearProgressIndicator(
-                      value: _progress > 0 ? _progress : null,
-                      color: const Color(0xFFFF007F),
-                      backgroundColor: Colors.white12,
+                  FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCenter: _center,
+                      initialZoom: _zoom,
+                      onPositionChanged: (pos, hasGesture) {
+                        if (pos.center != null) _center = pos.center!;
+                        if (pos.zoom != null) _zoom = pos.zoom!;
+                      },
                     ),
-                    const SizedBox(height: 8),
-                  ],
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF282836),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: _publicExportPath != null ? const Color(0xFF00F0FF) : Colors.transparent,
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.stanbg96.gtavc_builder',
                       ),
-                    ),
-                    child: Column(
-                      children: [
-                        Text(
-                          _statusMessage,
-                          style: const TextStyle(fontSize: 13, color: Colors.white70),
-                          textAlign: TextAlign.center,
-                        ),
-                        if (_publicExportPath != null) ...[
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  Clipboard.setData(ClipboardData(text: _publicExportPath!));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Пътят е копиран!')),
-                                  );
-                                },
-                                icon: const Icon(Icons.copy, size: 16),
-                                label: const Text('Копирай път'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF00F0FF),
-                                  foregroundColor: Colors.black,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                onPressed: _showInstallGuideDialog,
-                                icon: const Icon(Icons.info_outline, size: 16),
-                                label: const Text('Инструкции'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFF007F),
-                                  foregroundColor: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ],
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: _isProcessing ? null : _startGeneration,
-                    icon: const Icon(Icons.build_circle),
-                    label: Text(_isProcessing ? 'ГЕНЕРИРАНЕ...' : 'ГЕНЕРИРАЙ GTA VC ФАЙЛОВЕ'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF007F),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: FloatingActionButton.small(
+                      backgroundColor: const Color(0xFF1E1E28),
+                      foregroundColor: const Color(0xFF00F0FF),
+                      onPressed: _updateBboxFromMap,
+                      child: const Icon(Icons.my_location, size: 18),
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 10),
+
+            // Режим на текстуриране
+            Row(
+              children: [
+                Expanded(
+                  child: SegmentedButton<TexturingMode>(
+                    segments: const [
+                      ButtonSegment(value: TexturingMode.aiSatellite, label: Text('🛰️ AI Сателит', style: TextStyle(fontSize: 11))),
+                      ButtonSegment(value: TexturingMode.procedural32, label: Text('🏛️ 32 Текстури', style: TextStyle(fontSize: 11))),
+                    ],
+                    selected: {_selectedTexturingMode},
+                    onSelectionChanged: _isProcessing
+                        ? null
+                        : (newSelection) => setState(() => _selectedTexturingMode = newSelection.first),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SegmentedButton<TargetPlatformType>(
+                  segments: const [
+                    ButtonSegment(value: TargetPlatformType.pc, label: Text('PC', style: TextStyle(fontSize: 11))),
+                    ButtonSegment(value: TargetPlatformType.android, label: Text('Android', style: TextStyle(fontSize: 11))),
+                  ],
+                  selected: {_selectedPlatform},
+                  onSelectionChanged: _isProcessing
+                      ? null
+                      : (newSelection) => setState(() => _selectedPlatform = newSelection.first),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Избор на кола
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E28),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Стартова кола:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  DropdownButtonHideUnderline(
+                    child: DropdownButton<int>(
+                      value: _selectedVehicleId,
+                      dropdownColor: const Color(0xFF1E1E28),
+                      items: _vehicles.entries.map((e) {
+                        return DropdownMenuItem<int>(
+                          value: e.key,
+                          child: Text(e.value, style: const TextStyle(fontSize: 12, color: Color(0xFF00F0FF))),
+                        );
+                      }).toList>,
+                      onChanged: _isProcessing ? null : (val) {
+                        if (val != null) setState(() => _selectedVehicleId = val);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
+
+            // Лампи и дървета
+            SwitchListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Улични лампи и палми (Props)', style: TextStyle(fontSize: 12)),
+              value: _enableProps,
+              activeColor: const Color(0xFFFF007F),
+              onChanged: _isProcessing ? null : (val) => setState(() => _enableProps = val),
+            ),
+
+            // Координати (Компактна решетка)
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _minLatController,
+                    enabled: !_isProcessing,
+                    decoration: const InputDecoration(labelText: 'Min Lat (Юг)', isDense: true, border: OutlineInputBorder()),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: TextField(
+                    controller: _minLonController,
+                    enabled: !_isProcessing,
+                    decoration: const InputDecoration(labelText: 'Min Lon (Запад)', isDense: true, border: OutlineInputBorder()),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _maxLatController,
+                    enabled: !_isProcessing,
+                    decoration: const InputDecoration(labelText: 'Max Lat (Север)', isDense: true, border: OutlineInputBorder()),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: TextField(
+                    controller: _maxLonController,
+                    enabled: !_isProcessing,
+                    decoration: const InputDecoration(labelText: 'Max Lon (Изток)', isDense: true, border: OutlineInputBorder()),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Прогрес бар
+            if (_isProcessing) ...[
+              LinearProgressIndicator(
+                value: _progress > 0 ? _progress : null,
+                color: const Color(0xFFFF007F),
+                backgroundColor: Colors.white12,
+              ),
+              const SizedBox(height: 6),
+            ],
+
+            // Статус и Бутони за копиране / инструкции
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E28),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: _publicExportPath != null ? const Color(0xFF00F0FF) : Colors.white12,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    _statusMessage,
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (_publicExportPath != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: _publicExportPath!));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Пътят е копиран!')),
+                            );
+                          },
+                          icon: const Icon(Icons.copy, size: 14),
+                          label: const Text('Копирай път', style: TextStyle(fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00F0FF),
+                            foregroundColor: Colors.black,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: _showInstallGuideDialog,
+                          icon: const Icon(Icons.info_outline, size: 14),
+                          label: const Text('Инструкции', style: TextStyle(fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF007F),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      // Закован постоянен бутон най-долу на екрана
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E28),
+          border: Border(top: BorderSide(color: Colors.white12)),
+        ),
+        child: SafeArea(
+          child: ElevatedButton.icon(
+            onPressed: _isProcessing ? null : _startGeneration,
+            icon: const Icon(Icons.build_circle),
+            label: Text(
+              _isProcessing ? 'ГЕНЕРИРАНЕ...' : 'ГЕНЕРИРАЙ GTA VC ФАЙЛОВЕ',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF007F),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
