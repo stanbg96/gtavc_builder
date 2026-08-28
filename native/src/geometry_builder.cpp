@@ -110,42 +110,33 @@ void GeometryBuilder::ExtrudeBuilding(const BuildingData& bldg, ChunkMesh& mesh)
         mesh.vertices.push_back(v2);
         mesh.vertices.push_back(v3);
 
-        mesh.triangles.push_back({baseIdx, static_cast<uint16_t>(baseIdx + 1), static_cast<uint16_t>(baseIdx + 2), 0});
-        mesh.triangles.push_back({baseIdx, static_cast<uint16_t>(baseIdx + 2), static_cast<uint16_t>(baseIdx + 3), 0});
+        mesh.triangles.push_back({baseIdx, static_cast<uint16_t>(baseIdx + 1), static_cast<uint16_t>(baseIdx + 2), bldg.wallTextureId});
+        mesh.triangles.push_back({baseIdx, static_cast<uint16_t>(baseIdx + 2), static_cast<uint16_t>(baseIdx + 3), bldg.wallTextureId});
 
         totalDist += segLen;
     }
 
-    TriangulateRoof(poly, bldg.height, mesh);
-}
-
-void GeometryBuilder::TriangulateRoof(const std::vector<Vector2D>& poly, float height, ChunkMesh& mesh) {
+    // Покрив
     std::vector<int> indices;
-    if (!TriangulatePolygon(poly, indices)) return;
-
-    uint16_t baseIdx = static_cast<uint16_t>(mesh.vertices.size());
-
-    for (const auto& pt : poly) {
-        Vertex3D v;
-        v.x = pt.x;
-        v.y = pt.y;
-        v.z = height;
-        v.nx = 0.0f;
-        v.ny = 0.0f;
-        v.nz = 1.0f;
-        v.color = 0xFFCCCCCC;
-        v.u = pt.x * UV_ROOF_SCALE;
-        v.v = pt.y * UV_ROOF_SCALE;
-        mesh.vertices.push_back(v);
-    }
-
-    for (size_t i = 0; i < indices.size(); i += 3) {
-        TriangleFace tri;
-        tri.a = static_cast<uint16_t>(baseIdx + indices[i]);
-        tri.b = static_cast<uint16_t>(baseIdx + indices[i + 1]);
-        tri.c = static_cast<uint16_t>(baseIdx + indices[i + 2]);
-        tri.materialId = 1; // Roof
-        mesh.triangles.push_back(tri);
+    if (TriangulatePolygon(poly, indices)) {
+        uint16_t baseIdx = static_cast<uint16_t>(mesh.vertices.size());
+        for (const auto& pt : poly) {
+            Vertex3D v;
+            v.x = pt.x; v.y = pt.y; v.z = bldg.height;
+            v.nx = 0.0f; v.ny = 0.0f; v.nz = 1.0f;
+            v.color = 0xFFCCCCCC;
+            v.u = pt.x * UV_ROOF_SCALE;
+            v.v = pt.y * UV_ROOF_SCALE;
+            mesh.vertices.push_back(v);
+        }
+        for (size_t i = 0; i < indices.size(); i += 3) {
+            mesh.triangles.push_back({
+                static_cast<uint16_t>(baseIdx + indices[i]),
+                static_cast<uint16_t>(baseIdx + indices[i + 1]),
+                static_cast<uint16_t>(baseIdx + indices[i + 2]),
+                bldg.roofTextureId
+            });
+        }
     }
 }
 
@@ -181,8 +172,8 @@ void GeometryBuilder::GenerateRoad(const RoadSegment& road, ChunkMesh& mesh) {
         mesh.vertices.push_back(v2);
         mesh.vertices.push_back(v3);
 
-        mesh.triangles.push_back({baseIdx, static_cast<uint16_t>(baseIdx + 1), static_cast<uint16_t>(baseIdx + 2), 2});
-        mesh.triangles.push_back({baseIdx, static_cast<uint16_t>(baseIdx + 2), static_cast<uint16_t>(baseIdx + 3), 2});
+        mesh.triangles.push_back({baseIdx, static_cast<uint16_t>(baseIdx + 1), static_cast<uint16_t>(baseIdx + 2), road.roadTextureId});
+        mesh.triangles.push_back({baseIdx, static_cast<uint16_t>(baseIdx + 2), static_cast<uint16_t>(baseIdx + 3), road.roadTextureId});
 
         currentU = nextU;
     }
@@ -194,16 +185,11 @@ void GeometryBuilder::GenerateTerrain(const TerrainPolygon& terr, ChunkMesh& mes
 
     uint16_t baseIdx = static_cast<uint16_t>(mesh.vertices.size());
     float zHeight = (terr.terrainType == "water") ? -0.3f : 0.01f;
-    uint16_t matId = (terr.terrainType == "water") ? 4 : 3; // 4 = Water, 3 = Grass
 
     for (const auto& pt : terr.points) {
         Vertex3D v;
-        v.x = pt.x;
-        v.y = pt.y;
-        v.z = zHeight;
-        v.nx = 0.0f;
-        v.ny = 0.0f;
-        v.nz = 1.0f;
+        v.x = pt.x; v.y = pt.y; v.z = zHeight;
+        v.nx = 0.0f; v.ny = 0.0f; v.nz = 1.0f;
         v.color = 0xFFFFFFFF;
         v.u = pt.x * UV_TERRAIN_SCALE;
         v.v = pt.y * UV_TERRAIN_SCALE;
@@ -211,12 +197,12 @@ void GeometryBuilder::GenerateTerrain(const TerrainPolygon& terr, ChunkMesh& mes
     }
 
     for (size_t i = 0; i < indices.size(); i += 3) {
-        TriangleFace tri;
-        tri.a = static_cast<uint16_t>(baseIdx + indices[i]);
-        tri.b = static_cast<uint16_t>(baseIdx + indices[i + 1]);
-        tri.c = static_cast<uint16_t>(baseIdx + indices[i + 2]);
-        tri.materialId = matId;
-        mesh.triangles.push_back(tri);
+        mesh.triangles.push_back({
+            static_cast<uint16_t>(baseIdx + indices[i]),
+            static_cast<uint16_t>(baseIdx + indices[i + 1]),
+            static_cast<uint16_t>(baseIdx + indices[i + 2]),
+            terr.terrainTextureId
+        });
     }
 }
 
@@ -230,7 +216,6 @@ void GeometryBuilder::ComputeBounds(ChunkMesh& mesh) {
         mesh.bounds.min.x = std::min(mesh.bounds.min.x, v.x);
         mesh.bounds.min.y = std::min(mesh.bounds.min.y, v.y);
         mesh.bounds.min.z = std::min(mesh.bounds.min.z, v.z);
-
         mesh.bounds.max.x = std::max(mesh.bounds.max.x, v.x);
         mesh.bounds.max.y = std::max(mesh.bounds.max.y, v.y);
         mesh.bounds.max.z = std::max(mesh.bounds.max.z, v.z);
@@ -253,15 +238,9 @@ void GeometryBuilder::ComputeBounds(ChunkMesh& mesh) {
 
 ChunkMesh GeometryBuilder::BuildMesh(const MapChunk& chunk) {
     ChunkMesh mesh;
-    for (const auto& bldg : chunk.buildings) {
-        ExtrudeBuilding(bldg, mesh);
-    }
-    for (const auto& road : chunk.roads) {
-        GenerateRoad(road, mesh);
-    }
-    for (const auto& terr : chunk.terrain) {
-        GenerateTerrain(terr, mesh);
-    }
+    for (const auto& bldg : chunk.buildings) ExtrudeBuilding(bldg, mesh);
+    for (const auto& road : chunk.roads) GenerateRoad(road, mesh);
+    for (const auto& terr : chunk.terrain) GenerateTerrain(terr, mesh);
     ComputeBounds(mesh);
     return mesh;
 }

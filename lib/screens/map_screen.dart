@@ -26,33 +26,30 @@ class _MapScreenState extends State<MapScreen> {
   final TextEditingController _maxLonController = TextEditingController(text: '23.3250');
 
   TargetPlatformType _selectedPlatform = TargetPlatformType.android;
+  TexturingMode _selectedTexturingMode = TexturingMode.aiSatellite;
   bool _enableProps = true;
-  int _selectedVehicleId = 141; // Default: Ferrari Testarossa (Cheetah)
+  int _selectedVehicleId = 141;
   bool _isProcessing = false;
   double _progress = 0.0;
   String _statusMessage = 'Изберете зона и натиснете "Генерирай GTA VC Файлове"';
   String? _publicExportPath;
 
-  // Пълен каталог с Европейски и Японски марки и модели
   final Map<int, String> _vehicles = {
-    // --- ЕВРОПЕЙСКИ МАРКИ ---
     141: '🇪🇺 Ferrari Testarossa (Cheetah)',
     236: '🇪🇺 Lamborghini Countach (Infernus)',
-    188: '🇪🇺 Porsche 911 Turbo 930 (Comet)',
+    188: '🇪🇺 Porsche 911 Turbo (Comet)',
     205: '🇪🇺 BMW M3 E30 / Alpina (Sentinel XS)',
     138: '🇪🇺 Mercedes-Benz 560 SEC (Admiral)',
-    139: '🇪🇺 Ferrari Daytona 365 (Stinger)',
+    139: '🇪🇺 Ferrari Daytona (Stinger)',
     135: '🇪🇺 Mercedes-Benz 190E (Sentinel)',
-    // --- ЯПОНСКИ МАРКИ (JDM) ---
-    196: '🇯🇵 Honda CR-X / Civic Si (Blista Compact)',
-    208: '🇯🇵 Toyota Supra Mk3 / Celica (Sabre Turbo)',
-    189: '🇯🇵 Mazda RX-7 Rotary FC (Deluxo)',
+    196: '🇯🇵 Honda CR-X / Civic (Blista Compact)',
+    208: '🇯🇵 Toyota Supra Mk3 (Sabre Turbo)',
+    189: '🇯🇵 Mazda RX-7 Rotary (Deluxo)',
     130: '🇯🇵 Toyota Land Cruiser (Landstalker)',
-    191: '🇯🇵 Honda CBR / Suzuki GSX (PCJ-600)',
-    198: '🇯🇵 Yamaha XT500 / Enduro (Sanchez)',
-    168: '🇯🇵 Honda Super Cub / Tact (Faggio)',
-    // --- СПЕЦИАЛНИ ---
-    155: '🚁 Hunter Attack Chopper',
+    191: '🇯🇵 Honda CBR / Suzuki (PCJ-600)',
+    198: '🇯🇵 Yamaha XT / Enduro (Sanchez)',
+    168: '🇯🇵 Honda Super Cub (Faggio)',
+    155: '🚁 Hunter Chopper',
   };
 
   @override
@@ -99,7 +96,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
               SizedBox(height: 12),
               Text('3. Стартирай играта!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-              Text('Избраният автомобил и пълен паркинг от европейски и японски коли ще те чакат на улиците!'),
+              Text('Градът ще се зареди с избрания режим на текстури, коли и улично осветление!'),
             ],
           ),
         ),
@@ -154,6 +151,22 @@ class _MapScreenState extends State<MapScreen> {
         },
       );
 
+      File? satFile;
+      if (_selectedTexturingMode == TexturingMode.aiSatellite) {
+        satFile = await OsmService.downloadSatelliteTile(
+          minLat: minLat,
+          minLon: minLon,
+          maxLat: maxLat,
+          maxLon: maxLon,
+          onProgress: (p, msg) {
+            setState(() {
+              _progress = p;
+              _statusMessage = msg;
+            });
+          },
+        );
+      }
+
       final appDir = await getApplicationDocumentsDirectory();
       final folderName = 'GTA_VC_MAP_${DateTime.now().millisecondsSinceEpoch}';
       final internalOutDir = Directory('${appDir.path}/$folderName');
@@ -162,16 +175,20 @@ class _MapScreenState extends State<MapScreen> {
       }
 
       setState(() {
-        _statusMessage = 'C++ Енджинът изгражда 3D свят, европейски и японски автомобили...';
+        _statusMessage = _selectedTexturingMode == TexturingMode.aiSatellite
+            ? 'AI Анализира сателитната визия и строи 3D сградите...'
+            : 'C++ Енджинът генерира 32 архитектурни материала...';
       });
 
       final native = NativeBridge();
       final success = await native.convertOsmToGta(
         osmFilePath: osmFile.path,
         outputDirPath: internalOutDir.path,
+        satImagePath: satFile?.path,
         platform: _selectedPlatform,
         enableProps: _enableProps,
         spawnVehicleId: _selectedVehicleId,
+        texturingMode: _selectedTexturingMode,
         onProgress: (nativeProg) {
           setState(() {
             _progress = 0.5 + (nativeProg * 0.4);
@@ -216,9 +233,8 @@ class _MapScreenState extends State<MapScreen> {
         _statusMessage = ' Готово! Експортиран пълен GTA VC пакет ($fileCount файла):\n${publicDownloadDir.path}';
       });
 
-      if (await osmFile.exists()) {
-        await osmFile.delete();
-      }
+      if (await osmFile.exists()) await osmFile.delete();
+      if (satFile != null && await satFile.exists()) await satFile.delete();
     } catch (e) {
       setState(() {
         _statusMessage = 'Грешка: $e';
@@ -278,6 +294,24 @@ class _MapScreenState extends State<MapScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Text('Режим на текстуриране:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  SegmentedButton<TexturingMode>(
+                    segments: const [
+                      ButtonSegment(value: TexturingMode.aiSatellite, label: Text('🛰️ AI Сателит')),
+                      ButtonSegment(value: TexturingMode.procedural32, label: Text('🏛️ 32 Материала')),
+                    ],
+                    selected: {_selectedTexturingMode},
+                    onSelectionChanged: _isProcessing
+                        ? null
+                        : (newSelection) {
+                            setState(() {
+                              _selectedTexturingMode = newSelection.first;
+                            });
+                          },
+                  ),
+                  const SizedBox(height: 10),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -285,7 +319,7 @@ class _MapScreenState extends State<MapScreen> {
                       SegmentedButton<TargetPlatformType>(
                         segments: const [
                           ButtonSegment(value: TargetPlatformType.pc, label: Text('PC (D3D8)')),
-                          ButtonSegment(value: TargetPlatformType.android, label: Text('Android (Mobile)')),
+                          ButtonSegment(value: TargetPlatformType.android, label: Text('Android')),
                         ],
                         selected: {_selectedPlatform},
                         onSelectionChanged: _isProcessing
@@ -300,43 +334,42 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Падащо меню за избор на Европейски / Японски автомобил
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF282836),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<int>(
-                        value: _selectedVehicleId,
-                        isExpanded: true,
-                        dropdownColor: const Color(0xFF282836),
-                        items: _vehicles.entries.map((e) {
-                          return DropdownMenuItem<int>(
-                            value: e.key,
-                            child: Text(
-                              e.value,
-                              style: const TextStyle(fontSize: 13, color: Color(0xFF00F0FF)),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          );
-                        }).toList(),
-                        onChanged: _isProcessing
-                            ? null
-                            : (val) {
-                                if (val != null) setState(() => _selectedVehicleId = val);
-                              },
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Стартова кола:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF282836),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<int>(
+                            value: _selectedVehicleId,
+                            dropdownColor: const Color(0xFF282836),
+                            items: _vehicles.entries.map((e) {
+                              return DropdownMenuItem<int>(
+                                value: e.key,
+                                child: Text(e.value, style: const TextStyle(fontSize: 12, color: Color(0xFF00F0FF))),
+                              );
+                            }).toList(),
+                            onChanged: _isProcessing
+                                ? null
+                                : (val) {
+                                    if (val != null) setState(() => _selectedVehicleId = val);
+                                  },
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                   const SizedBox(height: 4),
 
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Улични лампи и палми (Props)', style: TextStyle(fontSize: 14)),
-                    subtitle: const Text('Автоматично населява улиците със стълбове и парковете с палми', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                    subtitle: const Text('Поставя стълбове по улиците и палми в парковете', style: TextStyle(fontSize: 11, color: Colors.white54)),
                     value: _enableProps,
                     activeColor: const Color(0xFFFF007F),
                     onChanged: _isProcessing ? null : (val) => setState(() => _enableProps = val),

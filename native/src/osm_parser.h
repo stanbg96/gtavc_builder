@@ -23,6 +23,13 @@ struct BuildingData {
     float height = 9.0f;
     int levels = 3;
     std::string buildingType = "yes";
+    std::string material = "";
+    std::string colour = "";
+    std::string roofMaterial = "";
+    std::string roofColour = "";
+    std::string shopType = "";
+    uint16_t wallTextureId = 0;
+    uint16_t roofTextureId = 16;
 };
 
 struct RoadSegment {
@@ -30,12 +37,14 @@ struct RoadSegment {
     std::vector<Vector2D> points;
     float width = 6.0f;
     std::string highwayType = "residential";
+    uint16_t roadTextureId = 23;
 };
 
 struct TerrainPolygon {
     int64_t id = 0;
     std::vector<Vector2D> points;
-    std::string terrainType; // "grass", "water"
+    std::string terrainType;
+    uint16_t terrainTextureId = 26;
 };
 
 struct MapChunk {
@@ -60,6 +69,7 @@ private:
     void SetOrigin(double lat, double lon);
     Vector2D ProjectLatLon(double lat, double lon) const;
     void PartitionIntoChunks(float chunkSizeMeters = 250.0f);
+    void AnalyzeBuildingTextures(BuildingData& bldg);
     
     static std::string ExtractAttr(const std::string& line, const std::string& attr);
     static float ParseHeight(const std::string& heightStr, const std::string& levelsStr);

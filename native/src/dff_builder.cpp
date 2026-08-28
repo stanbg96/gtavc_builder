@@ -16,6 +16,17 @@ static constexpr uint32_t rwID_ATOMIC       = 0x0014;
 static constexpr uint32_t rwID_GEOMETRYLIST = 0x001A;
 static constexpr uint32_t RW_VERSION_GTAVC  = 0x0C02FFFF;
 
+static const char* kTextureNames[32] = {
+    "fac_brick_red", "fac_brick_white", "fac_plaster_yellow", "fac_plaster_beige",
+    "fac_plaster_blue", "fac_plaster_pink", "fac_wood_panel", "fac_stone_rustic",
+    "fac_glass_blue", "fac_glass_dark", "fac_glass_green", "fac_concrete_modern",
+    "fac_concrete_panel", "fac_metal_cladding", "fac_storefront_shop", "fac_artdeco_white",
+    "roof_tile_red", "roof_tile_dark", "roof_tar_gravel", "roof_metal_sheet",
+    "roof_concrete", "roof_solar", "road_asphalt_dark", "road_asphalt_city",
+    "road_cobblestone", "ground_sidewalk", "ground_grass_lush", "ground_grass_dry",
+    "ground_sand_beach", "ground_dirt_gravel", "water_ocean_blue", "water_river_cyan"
+};
+
 class BinaryStream {
 public:
     std::vector<uint8_t> buffer;
@@ -49,9 +60,7 @@ public:
     void WriteStringChunk(const std::string& str) {
         BinaryStream s;
         s.WriteBytes(str.c_str(), str.length() + 1);
-        while (s.buffer.size() % 4 != 0) {
-            s.Write<uint8_t>(0);
-        }
+        while (s.buffer.size() % 4 != 0) s.Write<uint8_t>(0);
         EmbedChunk(rwID_STRING, s);
     }
 };
@@ -130,7 +139,7 @@ bool ExportChunkDff(const MapChunk& chunk, const std::string& outPath, int platf
     for (const auto& t : mesh.triangles) {
         geomStruct.Write<uint16_t>(t.b);
         geomStruct.Write<uint16_t>(t.a);
-        geomStruct.Write<uint16_t>(t.materialId);
+        geomStruct.Write<uint16_t>(t.materialId % 32);
         geomStruct.Write<uint16_t>(t.c);
     }
 
@@ -151,21 +160,18 @@ bool ExportChunkDff(const MapChunk& chunk, const std::string& outPath, int platf
         geomStruct.Write<float>(v.ny);
         geomStruct.Write<float>(v.nz);
     }
-
     geom.EmbedChunk(rwID_STRUCT, geomStruct);
 
-    // 5 Материала: wall, roof, road, grass, water
+    // 32 Материала в Clump
     BinaryStream matList;
     BinaryStream matListStruct;
-    matListStruct.Write<uint32_t>(5);
-    for (int i = 0; i < 5; ++i) matListStruct.Write<int32_t>(-1);
+    matListStruct.Write<uint32_t>(32);
+    for (int i = 0; i < 32; ++i) matListStruct.Write<int32_t>(-1);
     matList.EmbedChunk(rwID_STRUCT, matListStruct);
 
-    matList.EmbedChunk(rwID_MATERIAL, BuildMaterial("osm_wall"));
-    matList.EmbedChunk(rwID_MATERIAL, BuildMaterial("osm_roof"));
-    matList.EmbedChunk(rwID_MATERIAL, BuildMaterial("osm_road"));
-    matList.EmbedChunk(rwID_MATERIAL, BuildMaterial("osm_grass"));
-    matList.EmbedChunk(rwID_MATERIAL, BuildMaterial("osm_water"));
+    for (int i = 0; i < 32; ++i) {
+        matList.EmbedChunk(rwID_MATERIAL, BuildMaterial(kTextureNames[i]));
+    }
 
     geom.EmbedChunk(rwID_MATLIST, matList);
     geom.WriteEmptyExtension();

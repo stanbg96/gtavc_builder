@@ -120,32 +120,13 @@ static std::vector<PropInstance> GenerateWorldProps(const std::vector<MapChunk>&
 static std::vector<ParkedCar> GenerateParkedCars(const std::vector<MapChunk>& chunks, int primaryVehicleId) {
     std::vector<ParkedCar> cars;
 
-    // 1. Избраното превозно средство на стартовата позиция (X: 0.0, Y: 0.0)
     ParkedCar startCar;
     startCar.pos = {0.0f, 0.0f, 0.3f};
     startCar.angle = 90.0f;
     startCar.modelId = primaryVehicleId;
     cars.push_back(startCar);
 
-    // 2. Европейски и Японски автомобилен парк за улиците
-    int euroJapPool[] = {
-        // --- ЕВРОПЕЙСКИ ---
-        141, // Ferrari Testarossa (Cheetah)
-        236, // Lamborghini Countach (Infernus)
-        188, // Porsche 911 Turbo (Comet)
-        205, // BMW M3 E30 (Sentinel XS)
-        138, // Mercedes-Benz 560 SEC (Admiral)
-        139, // Ferrari Daytona (Stinger)
-        135, // Mercedes 190E (Sentinel)
-        // --- ЯПОНСКИ ---
-        196, // Honda CR-X / Civic Si (Blista Compact)
-        208, // Toyota Supra / Celica (Sabre Turbo)
-        189, // Mazda RX-7 Rotary (Deluxo)
-        130, // Toyota Land Cruiser (Landstalker)
-        191, // Honda CBR / Suzuki GSX (PCJ-600)
-        198, // Yamaha XT / Enduro (Sanchez)
-        168  // Honda Super Cub / Vespa (Faggio)
-    };
+    int euroJapPool[] = {141, 236, 188, 205, 138, 139, 135, 196, 208, 189, 130, 191, 198, 168};
     const size_t poolSize = sizeof(euroJapPool) / sizeof(euroJapPool[0]);
     size_t poolIdx = 0;
 
@@ -203,7 +184,6 @@ static bool ExportIplFile(const std::vector<MapChunk>& chunks, const std::vector
             << c.angle << ", " << c.modelId << ", -1, -1, 1, 0, 0, 0, 0\n";
     }
     out << "end\n";
-
     out.close();
     return true;
 }
@@ -273,16 +253,17 @@ static bool MergeColFiles(const std::vector<std::string>& colPaths, const std::s
     return true;
 }
 
-static bool ExportInstallGuide(const std::vector<MapChunk>& chunks, size_t propCount, size_t carCount, const std::string& outPath) {
+static bool ExportInstallGuide(const std::vector<MapChunk>& chunks, size_t propCount, size_t carCount, int texturingMode, const std::string& outPath) {
     std::ofstream out(outPath);
     if (!out.is_open()) return false;
 
     out << "=================================================================\n";
     out << "   GTA VICE CITY - ИНСТРУКЦИИ ЗА ИНСТАЛИРАНЕ НА КАРТАТА         \n";
     out << "=================================================================\n\n";
+    out << "• Режим на текстуриране: " << (texturingMode == 0 ? "AI Сателитен Анализ (Real Imagery)" : "32 Процедурни Материала") << "\n";
     out << "• 3D Квартали: " << chunks.size() << "\n";
     out << "• Улични лампи и палми: " << propCount << "\n";
-    out << "• Паркирани европейски и японски автомобили: " << carCount << "\n\n";
+    out << "• Паркирани автомобили: " << carCount << "\n\n";
     out << "1. СТЪПКА: Копирайте всички файлове от тази папка в:\n";
     out << "   GTA Vice City/data/maps/osm/\n\n";
     out << "2. СТЪПКА: Добавете следните 4 реда в data/gta_vc.dat:\n\n";
@@ -291,7 +272,7 @@ static bool ExportInstallGuide(const std::vector<MapChunk>& chunks, size_t propC
     out << "   IPL DATA\\MAPS\\OSM\\OSM_WORLD.IPL\n";
     out << "   COLFILE 0 DATA\\MAPS\\OSM\\OSM_WORLD.COL\n\n";
     out << "3. СТЪПКА: СТАРТИРАЙТЕ ИГРАТА!\n";
-    out << "   Колата ви чака на стартова точка: X: 0.0, Y: 0.0, Z: 15.0\n";
+    out << "   Координати на новия град: X: 0.0, Y: 0.0, Z: 15.0\n";
     out << "=================================================================\n";
     return true;
 }
@@ -303,13 +284,14 @@ __declspec(dllexport)
 #else
 __attribute__((visibility("default")))
 #endif
-int ProcessOsmData(const char* osmPath, const char* outDir, int targetPlatform, int enableProps, int spawnVehicleId, void (*progressCb)(float)) {
+int ProcessOsmData(const char* osmPath, const char* outDir, const char* satImagePath, int targetPlatform, int enableProps, int spawnVehicleId, int texturingMode, void (*progressCb)(float)) {
     if (!osmPath || !outDir) return -1;
 
     std::string osmFilePath(osmPath);
     std::string outputDirectory(outDir);
+    std::string satPath(satImagePath ? satImagePath : "");
 
-    LOGI("Започва обработка на OSM: %s (Props: %d, Car: %d)", osmFilePath.c_str(), enableProps, spawnVehicleId);
+    LOGI("Започва обработка на OSM: %s (Mode: %d, Sat: %s)", osmFilePath.c_str(), texturingMode, satPath.c_str());
     if (progressCb) progressCb(0.05f);
 
     OsmParser parser;
@@ -330,7 +312,7 @@ int ProcessOsmData(const char* osmPath, const char* outDir, int targetPlatform, 
 
     ExportIdeFile(chunks, outputDirectory + "/osm_world.ide");
     ExportIplFile(chunks, props, cars, outputDirectory + "/osm_world.ipl");
-    ExportInstallGuide(chunks, props.size(), cars.size(), outputDirectory + "/install_guide.txt");
+    ExportInstallGuide(chunks, props.size(), cars.size(), texturingMode, outputDirectory + "/install_guide.txt");
 
     std::vector<std::string> dffFiles = {txdPath};
     std::vector<std::string> colFiles;

@@ -23,6 +23,9 @@ class OsmService {
         'way["building"]($minLat,$minLon,$maxLat,$maxLon);'
         'relation["building"]($minLat,$minLon,$maxLat,$maxLon);'
         'way["highway"]($minLat,$minLon,$maxLat,$maxLon);'
+        'way["natural"]($minLat,$minLon,$maxLat,$maxLon);'
+        'way["leisure"]($minLat,$minLon,$maxLat,$maxLon);'
+        'way["landuse"]($minLat,$minLon,$maxLat,$maxLon);'
         ');'
         '(._;>;);'
         'out body;';
@@ -57,17 +60,17 @@ class OsmService {
             downloadedBytes += chunk.length;
             sink.add(chunk);
             if (contentLength > 0) {
-              final progress = 0.2 + (downloadedBytes / contentLength) * 0.3;
+              final progress = 0.2 + (downloadedBytes / contentLength) * 0.2;
               onProgress(progress, 'Свалени ${(downloadedBytes / 1024).toStringAsFixed(1)} KB');
             } else {
-              onProgress(0.35, 'Свалени ${(downloadedBytes / 1024).toStringAsFixed(1)} KB');
+              onProgress(0.30, 'Свалени ${(downloadedBytes / 1024).toStringAsFixed(1)} KB');
             }
           }).asFuture();
 
           await sink.flush();
           await sink.close();
 
-          onProgress(0.5, 'OSM данните са свалени успешно!');
+          onProgress(0.4, 'OSM данните са свалени успешно!');
           return file;
         } else {
           lastError = Exception('Сървърът $endpoint върна HTTP ${response.statusCode}');
@@ -78,5 +81,33 @@ class OsmService {
     }
 
     throw lastError ?? Exception('Неуспешно изтегляне на OSM данни');
+  }
+
+  // Сваляне на сателитна снимка за AI анализ
+  static Future<File?> downloadSatelliteTile({
+    required double minLat,
+    required double minLon,
+    required double maxLat,
+    required double maxLon,
+    required Function(double progress, String status) onProgress,
+  }) async {
+    try {
+      onProgress(0.42, 'Сваляне на сателитна снимка за AI анализ...');
+      final url = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export'
+          '?bbox=$minLon,$minLat,$maxLon,$maxLat&bboxSR=4326&size=512,512&imageSR=4326&format=png&f=image';
+
+      final response = await http.get(Uri.parse(url), headers: {
+        'User-Agent': 'GtaVcBuilderApp/1.0',
+      });
+
+      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+        final tempDir = await getTemporaryDirectory();
+        final file = File('${tempDir.path}/sat_${DateTime.now().millisecondsSinceEpoch}.png');
+        await file.writeAsBytes(response.bodyBytes);
+        onProgress(0.48, 'Сателитната снимка е готова за AI обработка!');
+        return file;
+      }
+    } catch (_) {}
+    return null;
   }
 }

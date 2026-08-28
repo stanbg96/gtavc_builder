@@ -5,15 +5,21 @@ import 'package:ffi/ffi.dart';
 typedef NativeProcessOsmFunc = Int32 Function(
     Pointer<Utf8> osmPath,
     Pointer<Utf8> outDir,
+    Pointer<Utf8> satImagePath,
     Int32 targetPlatform,
     Int32 enableProps,
+    Int32 spawnVehicleId,
+    Int32 texturingMode,
     Pointer<NativeFunction<Void Function(Float)>> callback);
 
 typedef DartProcessOsmFunc = int Function(
     Pointer<Utf8> osmPath,
     Pointer<Utf8> outDir,
+    Pointer<Utf8> satImagePath,
     int targetPlatform,
     int enableProps,
+    int spawnVehicleId,
+    int texturingMode,
     Pointer<NativeFunction<Void Function(Float)>> callback);
 
 enum TargetPlatformType {
@@ -22,6 +28,14 @@ enum TargetPlatformType {
 
   final int value;
   const TargetPlatformType(this.value);
+}
+
+enum TexturingMode {
+  aiSatellite(0),
+  procedural32(1);
+
+  final int value;
+  const TexturingMode(this.value);
 }
 
 class NativeBridge {
@@ -58,14 +72,18 @@ class NativeBridge {
   Future<bool> convertOsmToGta({
     required String osmFilePath,
     required String outputDirPath,
+    String? satImagePath,
     required TargetPlatformType platform,
     required bool enableProps,
+    required int spawnVehicleId,
+    required TexturingMode texturingMode,
     required Function(double progress) onProgress,
   }) async {
     _currentProgressCallback = onProgress;
 
     final osmPathPtr = osmFilePath.toNativeUtf8();
     final outDirPtr = outputDirPath.toNativeUtf8();
+    final satPathPtr = (satImagePath ?? '').toNativeUtf8();
 
     final nativeCallable = NativeCallable<Void Function(Float)>.listener(
       _nativeCallback,
@@ -75,14 +93,18 @@ class NativeBridge {
       final result = _processOsm(
         osmPathPtr,
         outDirPtr,
+        satPathPtr,
         platform.value,
         enableProps ? 1 : 0,
+        spawnVehicleId,
+        texturingMode.value,
         nativeCallable.nativeFunction,
       );
       return result == 0;
     } finally {
       calloc.free(osmPathPtr);
       calloc.free(outDirPtr);
+      calloc.free(satPathPtr);
       nativeCallable.close();
       _currentProgressCallback = null;
     }
