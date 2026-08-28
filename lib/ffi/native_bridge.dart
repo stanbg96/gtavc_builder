@@ -6,12 +6,14 @@ typedef NativeProcessOsmFunc = Int32 Function(
     Pointer<Utf8> osmPath,
     Pointer<Utf8> outDir,
     Int32 targetPlatform,
+    Int32 enableProps,
     Pointer<NativeFunction<Void Function(Float)>> callback);
 
 typedef DartProcessOsmFunc = int Function(
     Pointer<Utf8> osmPath,
     Pointer<Utf8> outDir,
     int targetPlatform,
+    int enableProps,
     Pointer<NativeFunction<Void Function(Float)>> callback);
 
 enum TargetPlatformType {
@@ -57,6 +59,7 @@ class NativeBridge {
     required String osmFilePath,
     required String outputDirPath,
     required TargetPlatformType platform,
+    required bool enableProps,
     required Function(double progress) onProgress,
   }) async {
     _currentProgressCallback = onProgress;
@@ -64,7 +67,6 @@ class NativeBridge {
     final osmPathPtr = osmFilePath.toNativeUtf8();
     final outDirPtr = outputDirPath.toNativeUtf8();
 
-    // Listener е нишково-защитен за void callbacks
     final nativeCallable = NativeCallable<Void Function(Float)>.listener(
       _nativeCallback,
     );
@@ -74,6 +76,7 @@ class NativeBridge {
         osmPathPtr,
         outDirPtr,
         platform.value,
+        enableProps ? 1 : 0,
         nativeCallable.nativeFunction,
       );
       return result == 0;

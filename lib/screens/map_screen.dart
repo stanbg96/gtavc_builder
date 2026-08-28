@@ -26,6 +26,7 @@ class _MapScreenState extends State<MapScreen> {
   final TextEditingController _maxLonController = TextEditingController(text: '23.3250');
 
   TargetPlatformType _selectedPlatform = TargetPlatformType.android;
+  bool _enableProps = true;
   bool _isProcessing = false;
   double _progress = 0.0;
   String _statusMessage = 'Изберете зона и натиснете "Генерирай GTA VC Файлове"';
@@ -75,7 +76,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
               SizedBox(height: 12),
               Text('3. Стартирай играта!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-              Text('Картата ще се зареди автоматично на координати X:0 Y:0 Z:15.'),
+              Text('Картата ще се зареди автоматично с улични лампи и дървета!'),
             ],
           ),
         ),
@@ -138,7 +139,7 @@ class _MapScreenState extends State<MapScreen> {
       }
 
       setState(() {
-        _statusMessage = 'C++ Енджинът изгражда 3D свят, .IMG архив и .COL колизии...';
+        _statusMessage = 'C++ Енджинът изгражда 3D свят, лампи, палми и архиви...';
       });
 
       final native = NativeBridge();
@@ -146,6 +147,7 @@ class _MapScreenState extends State<MapScreen> {
         osmFilePath: osmFile.path,
         outputDirPath: internalOutDir.path,
         platform: _selectedPlatform,
+        enableProps: _enableProps,
         onProgress: (nativeProg) {
           setState(() {
             _progress = 0.5 + (nativeProg * 0.4);
@@ -187,7 +189,7 @@ class _MapScreenState extends State<MapScreen> {
 
       setState(() {
         _progress = 1.0;
-        _statusMessage = ' Готово! Експортиран пълен GTA VC пакет ($fileCount файла):\n${publicDownloadDir.path}';
+        _statusMessage = ' Готово! Експортиран населен GTA VC свят ($fileCount файла):\n${publicDownloadDir.path}';
       });
 
       if (await osmFile.exists()) {
@@ -272,7 +274,19 @@ class _MapScreenState extends State<MapScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
+
+                  // Превключвател за лампи и дървета
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Улични лампи и дървета (Props)', style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('Автоматично добавя стълбове и палми в парковете', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                    value: _enableProps,
+                    activeColor: const Color(0xFFFF007F),
+                    onChanged: _isProcessing ? null : (val) => setState(() => _enableProps = val),
+                  ),
+                  const SizedBox(height: 8),
+
                   Row(
                     children: [
                       Expanded(
