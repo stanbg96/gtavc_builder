@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <cstring>
 #include <algorithm>
 #include "osm_parser.h"
 
@@ -19,6 +20,16 @@ bool ExportChunkDff(const MapChunk& chunk, const std::string& outPath, int platf
 bool ExportChunkCol(const MapChunk& chunk, const std::string& outPath);
 bool ExportSharedTxd(const std::string& outPath, int platform);
 
+static constexpr size_t SECTOR_SIZE = 2048;
+
+#pragma pack(push, 1)
+struct DirEntry {
+    uint32_t offset;  // Секторно отместване
+    uint32_t size;    // Размер в сектори
+    char name[24];    // Име на файла
+};
+#pragma pack(pop)
+
 static bool ExportIdeFile(const std::vector<MapChunk>& chunks, const std::string& outPath) {
     std::ofstream out(outPath);
     if (!out.is_open()) return false;
@@ -27,7 +38,6 @@ static bool ExportIdeFile(const std::vector<MapChunk>& chunks, const std::string
     out << "objs\n";
     int startId = 18000;
     for (size_t i = 0; i < chunks.size(); ++i) {
-        // ID, ModelName, TxdName, MeshCount, DrawDistance, Flags
         out << (startId + i) << ", " << chunks[i].chunkName << ", osm_world, 1, 650, 0\n";
     }
     out << "end\n";
@@ -44,7 +54,6 @@ static bool ExportIplFile(const std::vector<MapChunk>& chunks, const std::string
     out << "inst\n";
     int startId = 18000;
     for (size_t i = 0; i < chunks.size(); ++i) {
-        // ID, ModelName, Interior, PosX, PosY, PosZ, ScaleX, ScaleY, ScaleZ, RotX, RotY, RotZ, RotW
         out << (startId + i) << ", " << chunks[i].chunkName << ", 0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0\n";
     }
     out << "end\n";
@@ -53,26 +62,91 @@ static bool ExportIplFile(const std::vector<MapChunk>& chunks, const std::string
     return true;
 }
 
+static bool PackImgArchive(const std::vector<std::string>& filePaths, const std::string& outImgPath, const std::string& outDirPath) {
+    std::ofstream imgFile(outImgPath, std::ios::out | std::ios::binary);
+    std::ofstream dirFile(outDirPath, std::ios::out | std::ios::binary);
+
+    if (!imgFile.is_open() || !dirFile.is_open()) return false;
+
+    uint32_t currentSector = 0;
+
+    for (const auto& path : filePaths) {
+        std::ifstream src(path, std::ios::in | std::ios::binary | std::ios::ate);
+        if (!src.is_open()) continue;
+
+        size_t fileSize = src.tellg();
+        src.seekg(0, std::ios::beg);
+
+        std::vector<char> buffer(fileSize);
+        src.read(buffer.data(), fileSize);
+        src.close();
+
+        // Изчисляване на името на файла
+        size_t lastSlash = path.find_last_of("/\\");
+        std::string fileName = (lastSlash == std::string::npos) ? path : path.substr(lastSlash + 1);
+
+        uint32_t sectorCount = static_cast<uint32_t>((fileSize + SECTOR_SIZE - 1) / SECTOR_SIZE);
+
+        DirEntry entry;
+        std::memset(&entry, 0, sizeof(DirEntry));
+        entry.offset = currentSector;
+        entry.size = sectorCount;
+        std::strncpy(entry.name, fileName.c_str(), 23);
+
+        dirFile.write(reinterpret_cast<const char*>(&entry), sizeof(DirEntry));
+
+        imgFile.write(buffer.data(), fileSize);
+
+        // Подравняване до 2048 байта с нули
+        size_t padBytes = (sectorCount * SECTOR_SIZE) - fileSize;
+        if (padBytes > 0) {
+            std::vector<char> padding(padBytes, 0);
+            imgFile.write(padding.data(), padBytes);
+        }
+
+        currentSector += sectorCount;
+    }
+
+    imgFile.close();
+    dirFile.close();
+    return true;
+}
+
+static bool MergeColFiles(const std::vector<std::string>& colPaths, const std::string& mergedPath) {
+    std::ofstream out(mergedPath, std::ios::out | std::ios::binary);
+    if (!out.is_open()) return false;
+
+    for (const auto& path : colPaths) {
+        std::ifstream src(path, std::ios::in | std::ios::binary);
+        if (src.is_open()) {
+            out << src.rdbuf();
+            src.close();
+        }
+    }
+    out.close();
+    return true;
+}
+
 static bool ExportInstallGuide(const std::vector<MapChunk>& chunks, const std::string& outPath) {
     std::ofstream out(outPath);
     if (!out.is_open()) return false;
 
-    out << "=========================================================\n";
-    out << "   GTA VICE CITY - ИНСТРУКЦИИ ЗА ИНСТАЛИРАНЕ НА КАРТАТА   \n";
-    out << "=========================================================\n\n";
-    out << "Общо генерирани 3D квартали (chunks): " << chunks.size() << "\n\n";
-    out << "1. ИНСТАЛАЦИЯ В GTA VICE CITY (PC / Android):\n";
-    out << "--------------------------------------------\n";
-    out << "А) Поставете файловете osm_world.ide и osm_world.ipl в:\n";
+    out << "=================================================================\n";
+    out << "   GTA VICE CITY - ИНСТРУКЦИИ ЗА ИНСТАЛИРАНЕ НА КАРТАТА         \n";
+    out << "=================================================================\n\n";
+    out << "Общо генерирани 3D квартали: " << chunks.size() << "\n\n";
+    out << "1. СТЪПКА: Копирайте всички файлове от тази папка в:\n";
     out << "   GTA Vice City/data/maps/osm/\n\n";
-    out << "Б) Импортирайте всички .dff файлове и osm_world.txd в:\n";
-    out << "   GTA Vice City/models/gta3.img (чрез IMG Tool или Fastman92 Limit Adjuster)\n\n";
-    out << "В) Добавете следните редове във файла data/gta_vc.dat:\n";
+    out << "2. СТЪПКА: Отворете файла GTA Vice City/data/gta_vc.dat с текстов редактор\n";
+    out << "   и добавете следните 4 реда в секциите за карти:\n\n";
+    out << "   CDIMAGE DATA\\MAPS\\OSM\\OSM_MAP.IMG\n";
     out << "   IDE DATA\\MAPS\\OSM\\OSM_WORLD.IDE\n";
-    out << "   IPL DATA\\MAPS\\OSM\\OSM_WORLD.IPL\n\n";
-    out << "2. ТЕЛЕПОРТИРАНЕ В ИГРАТА:\n";
-    out << "   Координати на новия град: X: 0.0, Y: 0.0, Z: 15.0\n";
-    out << "=========================================================\n";
+    out << "   IPL DATA\\MAPS\\OSM\\OSM_WORLD.IPL\n";
+    out << "   COLFILE 0 DATA\\MAPS\\OSM\\OSM_WORLD.COL\n\n";
+    out << "3. СТЪПКА: СТАРТИРАЙТЕ ИГРАТА!\n";
+    out << "   Картата ще се зареди автоматично.\n";
+    out << "   Координати на центъра на града: X: 0.0, Y: 0.0, Z: 15.0\n";
+    out << "=================================================================\n";
     out.close();
     return true;
 }
@@ -109,21 +183,22 @@ int ProcessOsmData(const char* osmPath, const char* outDir, int targetPlatform, 
     const auto& chunks = parser.GetChunks();
     LOGI("Успешно генерирани %zu порции (chunks)", chunks.size());
 
-    // 1. Генериране на общ TXD (Texture Dictionary) файл
+    // 1. Генериране на общ TXD файл
     std::string txdPath = outputDirectory + "/osm_world.txd";
-    if (!ExportSharedTxd(txdPath, targetPlatform)) {
-        LOGE("Грешка при експортиране на TXD файл");
-        return -3;
-    }
+    ExportSharedTxd(txdPath, targetPlatform);
 
-    // 2. Генериране на .IDE и .IPL файлове за разполагане в играта
+    // 2. Генериране на .IDE, .IPL и Инсталационен гайд
     ExportIdeFile(chunks, outputDirectory + "/osm_world.ide");
     ExportIplFile(chunks, outputDirectory + "/osm_world.ipl");
     ExportInstallGuide(chunks, outputDirectory + "/install_guide.txt");
 
     // 3. Генериране на .DFF и .COL за всеки Chunk
+    std::vector<std::string> dffFiles;
+    std::vector<std::string> colFiles;
+    dffFiles.push_back(txdPath);
+
     float startProgress = 0.55f;
-    float step = 0.45f / static_cast<float>(std::max<size_t>(1, chunks.size()));
+    float step = 0.30f / static_cast<float>(std::max<size_t>(1, chunks.size()));
 
     for (size_t i = 0; i < chunks.size(); ++i) {
         const auto& chunk = chunks[i];
@@ -133,12 +208,24 @@ int ProcessOsmData(const char* osmPath, const char* outDir, int targetPlatform, 
         ExportChunkDff(chunk, dffPath, targetPlatform);
         ExportChunkCol(chunk, colPath);
 
+        dffFiles.push_back(dffPath);
+        colFiles.push_back(colPath);
+
         if (progressCb) {
             progressCb(startProgress + static_cast<float>(i + 1) * step);
         }
     }
 
-    LOGI("Всички GTA Vice City файлове (.dff, .txd, .col, .ide, .ipl) са генерирани успешно!");
+    // 4. Пакетиране на собствен GTA .IMG / .DIR архив
+    std::string imgPath = outputDirectory + "/osm_map.img";
+    std::string dirPath = outputDirectory + "/osm_map.dir";
+    PackImgArchive(dffFiles, imgPath, dirPath);
+
+    // 5. Обединяване на всички колизии в един osm_world.col
+    std::string mergedColPath = outputDirectory + "/osm_world.col";
+    MergeColFiles(colFiles, mergedColPath);
+
+    LOGI("Всички GTA Vice City активи са напълно готови!");
     if (progressCb) progressCb(1.0f);
 
     return 0;

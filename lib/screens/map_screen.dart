@@ -50,6 +50,45 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  void _showInstallGuideDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E28),
+        title: const Row(
+          children: [
+            Icon(Icons.sports_esports, color: Color(0xFFFF007F)),
+            SizedBox(width: 8),
+            Text('Как да пуснеш картата в GTA VC'),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('1. Копирай генерираната папка в:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
+              Text('GTA Vice City/data/maps/osm/\n', style: TextStyle(fontFamily: 'monospace', fontSize: 12)),
+              Text('2. Отвори data/gta_vc.dat и добави:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyan)),
+              SelectableText(
+                'CDIMAGE DATA\\MAPS\\OSM\\OSM_MAP.IMG\nIDE DATA\\MAPS\\OSM\\OSM_WORLD.IDE\nIPL DATA\\MAPS\\OSM\\OSM_WORLD.IPL\nCOLFILE 0 DATA\\MAPS\\OSM\\OSM_WORLD.COL',
+                style: TextStyle(fontFamily: 'monospace', color: Colors.amber, fontSize: 11),
+              ),
+              SizedBox(height: 12),
+              Text('3. Стартирай играта!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
+              Text('Картата ще се зареди автоматично на координати X:0 Y:0 Z:15.'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('РАЗБРАХ', style: TextStyle(color: Color(0xFFFF007F))),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _startGeneration() async {
     final minLat = double.tryParse(_minLatController.text);
     final minLon = double.tryParse(_minLonController.text);
@@ -78,7 +117,6 @@ class _MapScreenState extends State<MapScreen> {
     });
 
     try {
-      // 1. Сваляне на OSM
       final osmFile = await OsmService.downloadOsmArea(
         minLat: minLat,
         minLon: minLon,
@@ -92,7 +130,6 @@ class _MapScreenState extends State<MapScreen> {
         },
       );
 
-      // 2. Създаване на работна папка
       final appDir = await getApplicationDocumentsDirectory();
       final folderName = 'GTA_VC_MAP_${DateTime.now().millisecondsSinceEpoch}';
       final internalOutDir = Directory('${appDir.path}/$folderName');
@@ -101,10 +138,9 @@ class _MapScreenState extends State<MapScreen> {
       }
 
       setState(() {
-        _statusMessage = 'C++ Енджинът генерира 3D геометрия (.dff, .txd, .col)...';
+        _statusMessage = 'C++ Енджинът изгражда 3D свят, .IMG архив и .COL колизии...';
       });
 
-      // 3. Извикване на C++ NDK ядрото
       final native = NativeBridge();
       final success = await native.convertOsmToGta(
         osmFilePath: osmFile.path,
@@ -122,7 +158,6 @@ class _MapScreenState extends State<MapScreen> {
         throw Exception('C++ ядрото върна грешка при обработката!');
       }
 
-      // 4. Автоматично копиране в публичната папка Downloads
       setState(() {
         _statusMessage = 'Експортиране на файловете в папка Downloads...';
       });
@@ -152,10 +187,9 @@ class _MapScreenState extends State<MapScreen> {
 
       setState(() {
         _progress = 1.0;
-        _statusMessage = ' Готово! Експортирани $fileCount файла в:\n${publicDownloadDir.path}';
+        _statusMessage = ' Готово! Експортиран пълен GTA VC пакет ($fileCount файла):\n${publicDownloadDir.path}';
       });
 
-      // Изтриване на временния XML
       if (await osmFile.exists()) {
         await osmFile.delete();
       }
@@ -177,6 +211,11 @@ class _MapScreenState extends State<MapScreen> {
         title: const Text('GTA VC Map Builder (OSM)'),
         backgroundColor: const Color(0xFF1E1E28),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            tooltip: 'Инструкции за инсталиране',
+            onPressed: _showInstallGuideDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.crop_free),
             tooltip: 'Вземи координати от екрана',
@@ -303,21 +342,35 @@ class _MapScreenState extends State<MapScreen> {
                           textAlign: TextAlign.center,
                         ),
                         if (_publicExportPath != null) ...[
-                          const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: _publicExportPath!));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Пътят до папката е копиран в клипборда!')),
-                              );
-                            },
-                            icon: const Icon(Icons.copy, size: 16),
-                            label: const Text('Копирай пътя към Downloads'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF00F0FF),
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: _publicExportPath!));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Пътят е копиран!')),
+                                  );
+                                },
+                                icon: const Icon(Icons.copy, size: 16),
+                                label: const Text('Копирай път'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF00F0FF),
+                                  foregroundColor: Colors.black,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton.icon(
+                                onPressed: _showInstallGuideDialog,
+                                icon: const Icon(Icons.info_outline, size: 16),
+                                label: const Text('Инструкции'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFFF007F),
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ],
