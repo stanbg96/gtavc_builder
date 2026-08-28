@@ -27,10 +27,33 @@ class _MapScreenState extends State<MapScreen> {
 
   TargetPlatformType _selectedPlatform = TargetPlatformType.android;
   bool _enableProps = true;
+  int _selectedVehicleId = 141; // Default: Ferrari Testarossa (Cheetah)
   bool _isProcessing = false;
   double _progress = 0.0;
   String _statusMessage = 'Изберете зона и натиснете "Генерирай GTA VC Файлове"';
   String? _publicExportPath;
+
+  // Пълен каталог с Европейски и Японски марки и модели
+  final Map<int, String> _vehicles = {
+    // --- ЕВРОПЕЙСКИ МАРКИ ---
+    141: '🇪🇺 Ferrari Testarossa (Cheetah)',
+    236: '🇪🇺 Lamborghini Countach (Infernus)',
+    188: '🇪🇺 Porsche 911 Turbo 930 (Comet)',
+    205: '🇪🇺 BMW M3 E30 / Alpina (Sentinel XS)',
+    138: '🇪🇺 Mercedes-Benz 560 SEC (Admiral)',
+    139: '🇪🇺 Ferrari Daytona 365 (Stinger)',
+    135: '🇪🇺 Mercedes-Benz 190E (Sentinel)',
+    // --- ЯПОНСКИ МАРКИ (JDM) ---
+    196: '🇯🇵 Honda CR-X / Civic Si (Blista Compact)',
+    208: '🇯🇵 Toyota Supra Mk3 / Celica (Sabre Turbo)',
+    189: '🇯🇵 Mazda RX-7 Rotary FC (Deluxo)',
+    130: '🇯🇵 Toyota Land Cruiser (Landstalker)',
+    191: '🇯🇵 Honda CBR / Suzuki GSX (PCJ-600)',
+    198: '🇯🇵 Yamaha XT500 / Enduro (Sanchez)',
+    168: '🇯🇵 Honda Super Cub / Tact (Faggio)',
+    // --- СПЕЦИАЛНИ ---
+    155: '🚁 Hunter Attack Chopper',
+  };
 
   @override
   void dispose() {
@@ -76,7 +99,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
               SizedBox(height: 12),
               Text('3. Стартирай играта!', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent)),
-              Text('Картата ще се зареди автоматично с улични лампи и дървета!'),
+              Text('Избраният автомобил и пълен паркинг от европейски и японски коли ще те чакат на улиците!'),
             ],
           ),
         ),
@@ -139,7 +162,7 @@ class _MapScreenState extends State<MapScreen> {
       }
 
       setState(() {
-        _statusMessage = 'C++ Енджинът изгражда 3D свят, лампи, палми и архиви...';
+        _statusMessage = 'C++ Енджинът изгражда 3D свят, европейски и японски автомобили...';
       });
 
       final native = NativeBridge();
@@ -148,6 +171,7 @@ class _MapScreenState extends State<MapScreen> {
         outputDirPath: internalOutDir.path,
         platform: _selectedPlatform,
         enableProps: _enableProps,
+        spawnVehicleId: _selectedVehicleId,
         onProgress: (nativeProg) {
           setState(() {
             _progress = 0.5 + (nativeProg * 0.4);
@@ -189,7 +213,7 @@ class _MapScreenState extends State<MapScreen> {
 
       setState(() {
         _progress = 1.0;
-        _statusMessage = ' Готово! Експортиран населен GTA VC свят ($fileCount файла):\n${publicDownloadDir.path}';
+        _statusMessage = ' Готово! Експортиран пълен GTA VC пакет ($fileCount файла):\n${publicDownloadDir.path}';
       });
 
       if (await osmFile.exists()) {
@@ -276,11 +300,43 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Превключвател за лампи и дървета
+                  // Падащо меню за избор на Европейски / Японски автомобил
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF282836),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: _selectedVehicleId,
+                        isExpanded: true,
+                        dropdownColor: const Color(0xFF282836),
+                        items: _vehicles.entries.map((e) {
+                          return DropdownMenuItem<int>(
+                            value: e.key,
+                            child: Text(
+                              e.value,
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF00F0FF)),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: _isProcessing
+                            ? null
+                            : (val) {
+                                if (val != null) setState(() => _selectedVehicleId = val);
+                              },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Улични лампи и дървета (Props)', style: TextStyle(fontSize: 14)),
-                    subtitle: const Text('Автоматично добавя стълбове и палми в парковете', style: TextStyle(fontSize: 11, color: Colors.white54)),
+                    title: const Text('Улични лампи и палми (Props)', style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('Автоматично населява улиците със стълбове и парковете с палми', style: TextStyle(fontSize: 11, color: Colors.white54)),
                     value: _enableProps,
                     activeColor: const Color(0xFFFF007F),
                     onChanged: _isProcessing ? null : (val) => setState(() => _enableProps = val),

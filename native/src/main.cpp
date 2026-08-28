@@ -38,7 +38,12 @@ struct PropInstance {
     float rotZ;
 };
 
-// Проверка дали точка е вътре в 2D полигон
+struct ParkedCar {
+    Vector3D pos;
+    float angle;
+    int modelId;
+};
+
 static bool IsPointInPoly(const Vector2D& pt, const std::vector<Vector2D>& poly) {
     bool inside = false;
     size_t n = poly.size();
@@ -55,7 +60,6 @@ static std::vector<PropInstance> GenerateWorldProps(const std::vector<MapChunk>&
     std::vector<PropInstance> props;
 
     for (const auto& chunk : chunks) {
-        // 1. Улични лампи по пътищата (GTA VC ID: 622 -> lamppost1)
         for (const auto& road : chunk.roads) {
             float halfWidth = road.width * 0.5f + 1.2f;
             for (size_t i = 0; i < road.points.size() - 1; ++i) {
@@ -71,14 +75,13 @@ static std::vector<PropInstance> GenerateWorldProps(const std::vector<MapChunk>&
                 float ny = dx / len;
                 float rotZ = std::atan2(dy, dx);
 
-                // Поставяне на лампи на всеки 35 метра от двете страни на пътя
                 for (float d = 10.0f; d < len - 5.0f; d += 35.0f) {
                     float t = d / len;
                     float px = p1.x + t * dx;
                     float py = p1.y + t * dy;
 
                     PropInstance lamp;
-                    lamp.id = 622; // GTA VC стандартен стълб
+                    lamp.id = 622;
                     lamp.modelName = "lamppost1";
                     lamp.pos = {px + nx * halfWidth, py + ny * halfWidth, 0.0f};
                     lamp.rotZ = rotZ;
@@ -87,7 +90,6 @@ static std::vector<PropInstance> GenerateWorldProps(const std::vector<MapChunk>&
             }
         }
 
-        // 2. Дървета и Палми в парковете (GTA VC ID: 650 -> veg_palmb01)
         for (const auto& terr : chunk.terrain) {
             if (terr.terrainType != "grass" || terr.points.size() < 3) continue;
 
@@ -102,7 +104,7 @@ static std::vector<PropInstance> GenerateWorldProps(const std::vector<MapChunk>&
                 for (float y = minY + 8.0f; y < maxY - 8.0f; y += 22.0f) {
                     if (IsPointInPoly({x, y}, terr.points)) {
                         PropInstance tree;
-                        tree.id = 650; // GTA VC Палма
+                        tree.id = 650;
                         tree.modelName = "veg_palmb01";
                         tree.pos = {x, y, 0.0f};
                         tree.rotZ = static_cast<float>((static_cast<int>(x + y) % 360)) * 0.01745f;
@@ -112,24 +114,78 @@ static std::vector<PropInstance> GenerateWorldProps(const std::vector<MapChunk>&
             }
         }
     }
-
     return props;
 }
 
-static bool ExportIplFile(const std::vector<MapChunk>& chunks, const std::vector<PropInstance>& props, const std::string& outPath) {
+static std::vector<ParkedCar> GenerateParkedCars(const std::vector<MapChunk>& chunks, int primaryVehicleId) {
+    std::vector<ParkedCar> cars;
+
+    // 1. Избраното превозно средство на стартовата позиция (X: 0.0, Y: 0.0)
+    ParkedCar startCar;
+    startCar.pos = {0.0f, 0.0f, 0.3f};
+    startCar.angle = 90.0f;
+    startCar.modelId = primaryVehicleId;
+    cars.push_back(startCar);
+
+    // 2. Европейски и Японски автомобилен парк за улиците
+    int euroJapPool[] = {
+        // --- ЕВРОПЕЙСКИ ---
+        141, // Ferrari Testarossa (Cheetah)
+        236, // Lamborghini Countach (Infernus)
+        188, // Porsche 911 Turbo (Comet)
+        205, // BMW M3 E30 (Sentinel XS)
+        138, // Mercedes-Benz 560 SEC (Admiral)
+        139, // Ferrari Daytona (Stinger)
+        135, // Mercedes 190E (Sentinel)
+        // --- ЯПОНСКИ ---
+        196, // Honda CR-X / Civic Si (Blista Compact)
+        208, // Toyota Supra / Celica (Sabre Turbo)
+        189, // Mazda RX-7 Rotary (Deluxo)
+        130, // Toyota Land Cruiser (Landstalker)
+        191, // Honda CBR / Suzuki GSX (PCJ-600)
+        198, // Yamaha XT / Enduro (Sanchez)
+        168  // Honda Super Cub / Vespa (Faggio)
+    };
+    const size_t poolSize = sizeof(euroJapPool) / sizeof(euroJapPool[0]);
+    size_t poolIdx = 0;
+
+    for (const auto& chunk : chunks) {
+        for (const auto& road : chunk.roads) {
+            if (road.points.size() < 2) continue;
+            for (size_t i = 0; i < road.points.size() - 1; ++i) {
+                const auto& p1 = road.points[i];
+                const auto& p2 = road.points[i + 1];
+                float dx = p2.x - p1.x;
+                float dy = p2.y - p1.y;
+                float len = std::sqrt(dx * dx + dy * dy);
+                if (len > 35.0f) {
+                    float nx = -dy / len * (road.width * 0.5f - 1.2f);
+                    float ny = dx / len * (road.width * 0.5f - 1.2f);
+
+                    ParkedCar car;
+                    car.pos = {p1.x + dx * 0.5f + nx, p1.y + dy * 0.5f + ny, 0.3f};
+                    car.angle = std::atan2(dy, dx) * 57.29577f;
+                    car.modelId = euroJapPool[(poolIdx++) % poolSize];
+                    cars.push_back(car);
+                }
+            }
+        }
+    }
+    return cars;
+}
+
+static bool ExportIplFile(const std::vector<MapChunk>& chunks, const std::vector<PropInstance>& props, const std::vector<ParkedCar>& cars, const std::string& outPath) {
     std::ofstream out(outPath);
     if (!out.is_open()) return false;
 
     out << "# Generated by GTA VC Map Builder (OSM)\n";
     out << "inst\n";
 
-    // 1. Чанкове сгради
     int startId = 18000;
     for (size_t i = 0; i < chunks.size(); ++i) {
         out << (startId + i) << ", " << chunks[i].chunkName << ", 0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0\n";
     }
 
-    // 2. Улични лампи и дървета
     for (const auto& prop : props) {
         float qz = std::sin(prop.rotZ * 0.5f);
         float qw = std::cos(prop.rotZ * 0.5f);
@@ -140,6 +196,14 @@ static bool ExportIplFile(const std::vector<MapChunk>& chunks, const std::vector
 
     out << "end\n";
     out << "cull\nend\npath\nend\n";
+
+    out << "cars\n";
+    for (const auto& c : cars) {
+        out << c.pos.x << ", " << c.pos.y << ", " << c.pos.z << ", "
+            << c.angle << ", " << c.modelId << ", -1, -1, 1, 0, 0, 0, 0\n";
+    }
+    out << "end\n";
+
     out.close();
     return true;
 }
@@ -209,15 +273,16 @@ static bool MergeColFiles(const std::vector<std::string>& colPaths, const std::s
     return true;
 }
 
-static bool ExportInstallGuide(const std::vector<MapChunk>& chunks, size_t propCount, const std::string& outPath) {
+static bool ExportInstallGuide(const std::vector<MapChunk>& chunks, size_t propCount, size_t carCount, const std::string& outPath) {
     std::ofstream out(outPath);
     if (!out.is_open()) return false;
 
     out << "=================================================================\n";
     out << "   GTA VICE CITY - ИНСТРУКЦИИ ЗА ИНСТАЛИРАНЕ НА КАРТАТА         \n";
     out << "=================================================================\n\n";
-    out << "• Общо 3D квартали: " << chunks.size() << "\n";
-    out << "• Добавени улични лампи и дървета: " << propCount << "\n\n";
+    out << "• 3D Квартали: " << chunks.size() << "\n";
+    out << "• Улични лампи и палми: " << propCount << "\n";
+    out << "• Паркирани европейски и японски автомобили: " << carCount << "\n\n";
     out << "1. СТЪПКА: Копирайте всички файлове от тази папка в:\n";
     out << "   GTA Vice City/data/maps/osm/\n\n";
     out << "2. СТЪПКА: Добавете следните 4 реда в data/gta_vc.dat:\n\n";
@@ -226,7 +291,7 @@ static bool ExportInstallGuide(const std::vector<MapChunk>& chunks, size_t propC
     out << "   IPL DATA\\MAPS\\OSM\\OSM_WORLD.IPL\n";
     out << "   COLFILE 0 DATA\\MAPS\\OSM\\OSM_WORLD.COL\n\n";
     out << "3. СТЪПКА: СТАРТИРАЙТЕ ИГРАТА!\n";
-    out << "   Координати на новия град: X: 0.0, Y: 0.0, Z: 15.0\n";
+    out << "   Колата ви чака на стартова точка: X: 0.0, Y: 0.0, Z: 15.0\n";
     out << "=================================================================\n";
     return true;
 }
@@ -238,13 +303,13 @@ __declspec(dllexport)
 #else
 __attribute__((visibility("default")))
 #endif
-int ProcessOsmData(const char* osmPath, const char* outDir, int targetPlatform, int enableProps, void (*progressCb)(float)) {
+int ProcessOsmData(const char* osmPath, const char* outDir, int targetPlatform, int enableProps, int spawnVehicleId, void (*progressCb)(float)) {
     if (!osmPath || !outDir) return -1;
 
     std::string osmFilePath(osmPath);
     std::string outputDirectory(outDir);
 
-    LOGI("Започва обработка на OSM: %s (Props: %d)", osmFilePath.c_str(), enableProps);
+    LOGI("Започва обработка на OSM: %s (Props: %d, Car: %d)", osmFilePath.c_str(), enableProps, spawnVehicleId);
     if (progressCb) progressCb(0.05f);
 
     OsmParser parser;
@@ -256,16 +321,16 @@ int ProcessOsmData(const char* osmPath, const char* outDir, int targetPlatform, 
     std::string txdPath = outputDirectory + "/osm_world.txd";
     ExportSharedTxd(txdPath, targetPlatform);
 
-    // Генериране на улични лампи и дървета
     std::vector<PropInstance> props;
     if (enableProps) {
         props = GenerateWorldProps(chunks);
-        LOGI("Генерирани %zu лампи и дървета", props.size());
     }
 
+    std::vector<ParkedCar> cars = GenerateParkedCars(chunks, spawnVehicleId);
+
     ExportIdeFile(chunks, outputDirectory + "/osm_world.ide");
-    ExportIplFile(chunks, props, outputDirectory + "/osm_world.ipl");
-    ExportInstallGuide(chunks, props.size(), outputDirectory + "/install_guide.txt");
+    ExportIplFile(chunks, props, cars, outputDirectory + "/osm_world.ipl");
+    ExportInstallGuide(chunks, props.size(), cars.size(), outputDirectory + "/install_guide.txt");
 
     std::vector<std::string> dffFiles = {txdPath};
     std::vector<std::string> colFiles;
