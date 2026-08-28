@@ -20,7 +20,7 @@ struct TriangleFace {
     uint16_t a = 0;
     uint16_t b = 0;
     uint16_t c = 0;
-    uint16_t materialId = 0; // 0: Wall, 1: Roof, 2: Road
+    uint16_t materialId = 0; // 0: Wall, 1: Roof, 2: Road, 3: Grass, 4: Water
 };
 
 struct BoundingVolume {
@@ -44,9 +44,9 @@ private:
     static void ExtrudeBuilding(const BuildingData& bldg, ChunkMesh& mesh);
     static void TriangulateRoof(const std::vector<Vector2D>& poly, float height, ChunkMesh& mesh);
     static void GenerateRoad(const RoadSegment& road, ChunkMesh& mesh);
+    static void GenerateTerrain(const TerrainPolygon& terr, ChunkMesh& mesh);
     static void ComputeBounds(ChunkMesh& mesh);
     
-    // Ear Clipping за триангулиране на 2D полигони (покриви)
     static bool IsEar(const std::vector<Vector2D>& p, int u, int v, int w, int n, const int* V);
     static bool TriangulatePolygon(const std::vector<Vector2D>& polygon, std::vector<int>& outIndices);
 };

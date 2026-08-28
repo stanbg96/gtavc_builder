@@ -7,7 +7,7 @@
 
 static constexpr double PI = 3.14159265358979323846;
 static constexpr double DEG2RAD = PI / 180.0;
-static constexpr double EARTH_RADIUS = 6378137.0; // WGS84 радиус в метри
+static constexpr double EARTH_RADIUS = 6378137.0;
 
 OsmParser::OsmParser() = default;
 OsmParser::~OsmParser() = default;
@@ -44,12 +44,12 @@ float OsmParser::ParseHeight(const std::string& heightStr, const std::string& le
         try {
             int levels = std::stoi(levelsStr);
             if (levels > 0 && levels < 150) {
-                return static_cast<float>(levels) * 3.2f; // ~3.2m на етаж
+                return static_cast<float>(levels) * 3.2f;
             }
         } catch (...) {}
     }
 
-    return 9.0f; // Стандартна височина (3 етажа)
+    return 9.0f;
 }
 
 void OsmParser::SetOrigin(double lat, double lon) {
@@ -72,7 +72,6 @@ bool OsmParser::ParseStream(const std::string& filePath, std::function<void(floa
     std::ifstream file(filePath, std::ios::in | std::ios::binary);
     if (!file.is_open()) return false;
 
-    // Определяне на размера на файла за точен progress callback
     file.seekg(0, std::ios::end);
     size_t totalBytes = file.tellg();
     file.seekg(0, std::ios::beg);
@@ -83,13 +82,15 @@ bool OsmParser::ParseStream(const std::string& filePath, std::function<void(floa
     std::vector<int64_t> currentWayRefs;
     std::string buildingTagValue = "";
     std::string highwayTagValue = "";
+    std::string naturalTagValue = "";
+    std::string leisureTagValue = "";
+    std::string landuseTagValue = "";
     std::string heightTagValue = "";
     std::string levelsTagValue = "";
 
     size_t processedBytes = 0;
     size_t lastReport = 0;
 
-    // Стрийминг обработка ред по ред (предотвратява OutOfMemory на телефона)
     while (std::getline(file, line)) {
         processedBytes += line.length() + 1;
 
@@ -100,7 +101,6 @@ bool OsmParser::ParseStream(const std::string& filePath, std::function<void(floa
             }
         }
 
-        // Парсване на <node ...>
         if (line.find("<node") != std::string::npos) {
             std::string idStr = ExtractAttr(line, "id");
             std::string latStr = ExtractAttr(line, "lat");
@@ -123,7 +123,6 @@ bool OsmParser::ParseStream(const std::string& filePath, std::function<void(floa
             continue;
         }
 
-        // Парсване на <way ...>
         if (line.find("<way") != std::string::npos) {
             inWay = true;
             std::string idStr = ExtractAttr(line, "id");
@@ -131,6 +130,9 @@ bool OsmParser::ParseStream(const std::string& filePath, std::function<void(floa
             currentWayRefs.clear();
             buildingTagValue.clear();
             highwayTagValue.clear();
+            naturalTagValue.clear();
+            leisureTagValue.clear();
+            landuseTagValue.clear();
             heightTagValue.clear();
             levelsTagValue.clear();
             continue;
@@ -150,12 +152,15 @@ bool OsmParser::ParseStream(const std::string& filePath, std::function<void(floa
 
                 if (k == "building") buildingTagValue = v;
                 else if (k == "highway") highwayTagValue = v;
+                else if (k == "natural") naturalTagValue = v;
+                else if (k == "leisure") leisureTagValue = v;
+                else if (k == "landuse") landuseTagValue = v;
                 else if (k == "height") heightTagValue = v;
                 else if (k == "building:levels") levelsTagValue = v;
             } else if (line.find("</way>") != std::string::npos) {
                 inWay = false;
 
-                // Валидиране на сграда
+                // 1. Сгради
                 if (!buildingTagValue.empty() && currentWayRefs.size() >= 3) {
                     BuildingData bldg;
                     bldg.id = currentWayId;
@@ -165,9 +170,7 @@ bool OsmParser::ParseStream(const std::string& filePath, std::function<void(floa
 
                     for (int64_t ref : currentWayRefs) {
                         auto it = node_lookup_.find(ref);
-                        if (it != node_lookup_.end()) {
-                            bldg.footprint.push_back(it->second);
-                        }
+                        if (it != node_lookup_.end()) bldg.footprint.push_back(it->second);
                     }
 
                     if (bldg.footprint.size() >= 3) {
@@ -175,7 +178,7 @@ bool OsmParser::ParseStream(const std::string& filePath, std::function<void(floa
                         total_buildings_++;
                     }
                 }
-                // Валидиране на пътна мрежа
+                // 2. Пътна мрежа
                 else if (!highwayTagValue.empty() && currentWayRefs.size() >= 2) {
                     RoadSegment road;
                     road.id = currentWayId;
@@ -184,13 +187,26 @@ bool OsmParser::ParseStream(const std::string& filePath, std::function<void(floa
 
                     for (int64_t ref : currentWayRefs) {
                         auto it = node_lookup_.find(ref);
-                        if (it != node_lookup_.end()) {
-                            road.points.push_back(it->second);
-                        }
+                        if (it != node_lookup_.end()) road.points.push_back(it->second);
                     }
 
                     if (road.points.size() >= 2) {
                         parsed_roads_.push_back(std::move(road));
+                    }
+                }
+                // 3. Водни площи и Паркове
+                else if ((naturalTagValue == "water" || leisureTagValue == "park" || landuseTagValue == "grass") && currentWayRefs.size() >= 3) {
+                    TerrainPolygon terrain;
+                    terrain.id = currentWayId;
+                    terrain.terrainType = (naturalTagValue == "water") ? "water" : "grass";
+
+                    for (int64_t ref : currentWayRefs) {
+                        auto it = node_lookup_.find(ref);
+                        if (it != node_lookup_.end()) terrain.points.push_back(it->second);
+                    }
+
+                    if (terrain.points.size() >= 3) {
+                        parsed_terrain_.push_back(std::move(terrain));
                     }
                 }
             }
@@ -198,13 +214,8 @@ bool OsmParser::ParseStream(const std::string& filePath, std::function<void(floa
     }
 
     file.close();
-
-    // Разпределяне на сградите и пътищата на порции (Chunks) за защита на RAM паметта
     PartitionIntoChunks(250.0f);
-
-    // Освобождаване на паметта от огромния мап с възли
     node_lookup_.clear();
-
     return !chunks_.empty();
 }
 
@@ -213,13 +224,8 @@ void OsmParser::PartitionIntoChunks(float chunkSizeMeters) {
 
     for (const auto& bldg : parsed_buildings_) {
         if (bldg.footprint.empty()) continue;
-
-        // Изчисляване на центъра на сградата
         float cx = 0.0f, cy = 0.0f;
-        for (const auto& pt : bldg.footprint) {
-            cx += pt.x;
-            cy += pt.y;
-        }
+        for (const auto& pt : bldg.footprint) { cx += pt.x; cy += pt.y; }
         cx /= static_cast<float>(bldg.footprint.size());
         cy /= static_cast<float>(bldg.footprint.size());
 
@@ -235,17 +241,26 @@ void OsmParser::PartitionIntoChunks(float chunkSizeMeters) {
 
     for (const auto& road : parsed_roads_) {
         if (road.points.empty()) continue;
-        float rx = road.points[0].x;
-        float ry = road.points[0].y;
-
-        int cellX = static_cast<int>(std::floor(rx / chunkSizeMeters));
-        int cellY = static_cast<int>(std::floor(ry / chunkSizeMeters));
+        int cellX = static_cast<int>(std::floor(road.points[0].x / chunkSizeMeters));
+        int cellY = static_cast<int>(std::floor(road.points[0].y / chunkSizeMeters));
 
         auto& targetChunk = chunkMap[{cellX, cellY}];
         targetChunk.chunkX = cellX;
         targetChunk.chunkY = cellY;
         targetChunk.chunkName = "chunk_" + std::to_string(cellX) + "_" + std::to_string(cellY);
         targetChunk.roads.push_back(road);
+    }
+
+    for (const auto& terr : parsed_terrain_) {
+        if (terr.points.empty()) continue;
+        int cellX = static_cast<int>(std::floor(terr.points[0].x / chunkSizeMeters));
+        int cellY = static_cast<int>(std::floor(terr.points[0].y / chunkSizeMeters));
+
+        auto& targetChunk = chunkMap[{cellX, cellY}];
+        targetChunk.chunkX = cellX;
+        targetChunk.chunkY = cellY;
+        targetChunk.chunkName = "chunk_" + std::to_string(cellX) + "_" + std::to_string(cellY);
+        targetChunk.terrain.push_back(terr);
     }
 
     chunks_.reserve(chunkMap.size());

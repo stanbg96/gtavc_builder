@@ -3,7 +3,6 @@
 #include <vector>
 #include <cstring>
 
-// RenderWare 3.4 IDs
 static constexpr uint32_t rwID_STRUCT       = 0x0001;
 static constexpr uint32_t rwID_STRING       = 0x0002;
 static constexpr uint32_t rwID_EXTENSION    = 0x0003;
@@ -15,8 +14,6 @@ static constexpr uint32_t rwID_GEOMETRY     = 0x000F;
 static constexpr uint32_t rwID_CLUMP        = 0x0010;
 static constexpr uint32_t rwID_ATOMIC       = 0x0014;
 static constexpr uint32_t rwID_GEOMETRYLIST = 0x001A;
-
-// RenderWare Version Stamp за GTA Vice City (3.4.0.3)
 static constexpr uint32_t RW_VERSION_GTAVC  = 0x0C02FFFF;
 
 class BinaryStream {
@@ -52,7 +49,6 @@ public:
     void WriteStringChunk(const std::string& str) {
         BinaryStream s;
         s.WriteBytes(str.c_str(), str.length() + 1);
-        // Подравняване до 4 байта
         while (s.buffer.size() % 4 != 0) {
             s.Write<uint8_t>(0);
         }
@@ -62,26 +58,23 @@ public:
 
 static BinaryStream BuildMaterial(const std::string& texName) {
     BinaryStream mat;
-
-    // rwID_STRUCT за Материал
     BinaryStream matStruct;
-    matStruct.Write<uint32_t>(0);          // flags
-    matStruct.Write<uint32_t>(0xFFFFFFFF); // Color RGBA
-    matStruct.Write<uint32_t>(1);          // Unused
-    matStruct.Write<int32_t>(1);           // isTextured = true
-    matStruct.Write<float>(1.0f);          // ambient
-    matStruct.Write<float>(1.0f);          // specular
-    matStruct.Write<float>(1.0f);          // diffuse
+    matStruct.Write<uint32_t>(0);
+    matStruct.Write<uint32_t>(0xFFFFFFFF);
+    matStruct.Write<uint32_t>(1);
+    matStruct.Write<int32_t>(1);
+    matStruct.Write<float>(1.0f);
+    matStruct.Write<float>(1.0f);
+    matStruct.Write<float>(1.0f);
     mat.EmbedChunk(rwID_STRUCT, matStruct);
 
-    // rwID_TEXTURE
     BinaryStream tex;
     BinaryStream texStruct;
-    texStruct.Write<uint16_t>(0x1106);     // Filter & addressing (wrap)
-    texStruct.Write<uint16_t>(0);          // Padding
+    texStruct.Write<uint16_t>(0x1106);
+    texStruct.Write<uint16_t>(0);
     tex.EmbedChunk(rwID_STRUCT, texStruct);
     tex.WriteStringChunk(texName);
-    tex.WriteStringChunk("");              // Mask Name
+    tex.WriteStringChunk("");
     tex.WriteEmptyExtension();
     mat.EmbedChunk(rwID_TEXTURE, tex);
 
@@ -96,58 +89,44 @@ bool ExportChunkDff(const MapChunk& chunk, const std::string& outPath, int platf
 
     BinaryStream clump;
 
-    // 1. Clump Struct
     BinaryStream clumpStruct;
-    clumpStruct.Write<uint32_t>(1); // numAtomics
-    clumpStruct.Write<uint32_t>(0); // numLights
-    clumpStruct.Write<uint32_t>(0); // numCameras
+    clumpStruct.Write<uint32_t>(1);
+    clumpStruct.Write<uint32_t>(0);
+    clumpStruct.Write<uint32_t>(0);
     clump.EmbedChunk(rwID_STRUCT, clumpStruct);
 
-    // 2. FrameList
     BinaryStream frameList;
     BinaryStream frameStruct;
-    frameStruct.Write<uint32_t>(1); // 1 frame
-    // Identity Matrix
+    frameStruct.Write<uint32_t>(1);
     float matrix[9] = {1,0,0, 0,1,0, 0,0,1};
     float pos[3] = {0,0,0};
     frameStruct.WriteBytes(matrix, sizeof(matrix));
     frameStruct.WriteBytes(pos, sizeof(pos));
-    frameStruct.Write<int32_t>(-1); // Parent frame index
-    frameStruct.Write<uint32_t>(0); // Frame flags
+    frameStruct.Write<int32_t>(-1);
+    frameStruct.Write<uint32_t>(0);
     frameList.EmbedChunk(rwID_STRUCT, frameStruct);
     frameList.WriteEmptyExtension();
     clump.EmbedChunk(rwID_FRAMELIST, frameList);
 
-    // 3. GeometryList
     BinaryStream geomList;
     BinaryStream geomListStruct;
-    geomListStruct.Write<uint32_t>(1); // 1 geometry
+    geomListStruct.Write<uint32_t>(1);
     geomList.EmbedChunk(rwID_STRUCT, geomListStruct);
 
-    // 3.1. Geometry
     BinaryStream geom;
     BinaryStream geomStruct;
-
-    // Flags: Prelit | Textured | Normals | Positions
     uint16_t flags = 0x0001 | 0x0004 | 0x0010 | 0x0008;
     geomStruct.Write<uint16_t>(flags);
-    geomStruct.Write<uint16_t>(0); // numUVs = 1
+    geomStruct.Write<uint16_t>(0);
     geomStruct.Write<uint32_t>(static_cast<uint32_t>(mesh.triangles.size()));
     geomStruct.Write<uint32_t>(static_cast<uint32_t>(mesh.vertices.size()));
-    geomStruct.Write<uint32_t>(1); // numMorphTargets
+    geomStruct.Write<uint32_t>(1);
 
-    // Prelit colors
-    for (const auto& v : mesh.vertices) {
-        geomStruct.Write<uint32_t>(v.color);
-    }
-
-    // TexCoords (UV)
+    for (const auto& v : mesh.vertices) geomStruct.Write<uint32_t>(v.color);
     for (const auto& v : mesh.vertices) {
         geomStruct.Write<float>(v.u);
         geomStruct.Write<float>(v.v);
     }
-
-    // Triangles: uint16 vertex2, vertex1, matId, vertex3
     for (const auto& t : mesh.triangles) {
         geomStruct.Write<uint16_t>(t.b);
         geomStruct.Write<uint16_t>(t.a);
@@ -155,20 +134,18 @@ bool ExportChunkDff(const MapChunk& chunk, const std::string& outPath, int platf
         geomStruct.Write<uint16_t>(t.c);
     }
 
-    // Morph Target: Bounding Sphere & Vertices & Normals
     geomStruct.Write<float>(mesh.bounds.center.x);
     geomStruct.Write<float>(mesh.bounds.center.y);
     geomStruct.Write<float>(mesh.bounds.center.z);
     geomStruct.Write<float>(mesh.bounds.radius);
-    geomStruct.Write<uint32_t>(1); // Has positions
-    geomStruct.Write<uint32_t>(1); // Has normals
+    geomStruct.Write<uint32_t>(1);
+    geomStruct.Write<uint32_t>(1);
 
     for (const auto& v : mesh.vertices) {
         geomStruct.Write<float>(v.x);
         geomStruct.Write<float>(v.y);
         geomStruct.Write<float>(v.z);
     }
-
     for (const auto& v : mesh.vertices) {
         geomStruct.Write<float>(v.nx);
         geomStruct.Write<float>(v.ny);
@@ -177,18 +154,18 @@ bool ExportChunkDff(const MapChunk& chunk, const std::string& outPath, int platf
 
     geom.EmbedChunk(rwID_STRUCT, geomStruct);
 
-    // 3.2. MaterialList
+    // 5 Материала: wall, roof, road, grass, water
     BinaryStream matList;
     BinaryStream matListStruct;
-    matListStruct.Write<uint32_t>(3); // 3 Материала: wall, roof, road
-    matListStruct.Write<int32_t>(-1);
-    matListStruct.Write<int32_t>(-1);
-    matListStruct.Write<int32_t>(-1);
+    matListStruct.Write<uint32_t>(5);
+    for (int i = 0; i < 5; ++i) matListStruct.Write<int32_t>(-1);
     matList.EmbedChunk(rwID_STRUCT, matListStruct);
 
     matList.EmbedChunk(rwID_MATERIAL, BuildMaterial("osm_wall"));
     matList.EmbedChunk(rwID_MATERIAL, BuildMaterial("osm_roof"));
     matList.EmbedChunk(rwID_MATERIAL, BuildMaterial("osm_road"));
+    matList.EmbedChunk(rwID_MATERIAL, BuildMaterial("osm_grass"));
+    matList.EmbedChunk(rwID_MATERIAL, BuildMaterial("osm_water"));
 
     geom.EmbedChunk(rwID_MATLIST, matList);
     geom.WriteEmptyExtension();
@@ -196,20 +173,18 @@ bool ExportChunkDff(const MapChunk& chunk, const std::string& outPath, int platf
     geomList.EmbedChunk(rwID_GEOMETRY, geom);
     clump.EmbedChunk(rwID_GEOMETRYLIST, geomList);
 
-    // 4. Atomic
     BinaryStream atomic;
     BinaryStream atomicStruct;
-    atomicStruct.Write<uint32_t>(0); // frameIndex
-    atomicStruct.Write<uint32_t>(0); // geometryIndex
-    atomicStruct.Write<uint32_t>(5); // flags: Render | Collision
-    atomicStruct.Write<uint32_t>(0); // unused
+    atomicStruct.Write<uint32_t>(0);
+    atomicStruct.Write<uint32_t>(0);
+    atomicStruct.Write<uint32_t>(5);
+    atomicStruct.Write<uint32_t>(0);
     atomic.EmbedChunk(rwID_STRUCT, atomicStruct);
     atomic.WriteEmptyExtension();
     clump.EmbedChunk(rwID_ATOMIC, atomic);
 
     clump.WriteEmptyExtension();
 
-    // Запис във файла
     std::ofstream out(outPath, std::ios::out | std::ios::binary);
     if (!out.is_open()) return false;
 

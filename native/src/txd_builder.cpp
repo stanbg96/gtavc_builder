@@ -49,17 +49,22 @@ static void GenerateTexturePixels(const std::string& name, int width, int height
             uint32_t color = 0xFFFFFFFF;
 
             if (name == "osm_wall") {
-                // Тухлена/фасадна текстура (бежово с линии)
                 bool isMortar = (y % 8 == 0) || ((y / 8) % 2 == 0 && x % 16 == 0) || ((y / 8) % 2 != 0 && (x + 8) % 16 == 0);
-                color = isMortar ? 0xFF888888 : 0xFF35486B; // BGR: тухлен цвят
+                color = isMortar ? 0xFF888888 : 0xFF35486B;
             } else if (name == "osm_roof") {
-                // Тъмно сив асфалт за покрив с текстурен шум
                 uint8_t noise = static_cast<uint8_t>(40 + ((x ^ y) % 25));
                 color = (0xFF << 24) | (noise << 16) | (noise << 8) | noise;
             } else if (name == "osm_road") {
-                // Асфалт с осева пунктирана линия
                 bool isCenterLine = (x >= width / 2 - 1 && x <= width / 2 + 1) && (y % 16 < 10);
                 color = isCenterLine ? 0xFFEEEEEE : 0xFF2A2A2A;
+            } else if (name == "osm_grass") {
+                // Зелена текстура за паркове
+                uint8_t g = static_cast<uint8_t>(100 + ((x * 7 + y * 13) % 40));
+                color = (0xFF << 24) | (20 << 16) | (g << 8) | 35;
+            } else if (name == "osm_water") {
+                // Синьо-лазурна текстура с вълни
+                uint8_t b = static_cast<uint8_t>(180 + ((x * 3 + y * 5) % 45));
+                color = (0xFF << 24) | (b << 16) | (110 << 8) | 30;
             }
 
             outPixels[y * width + x] = color;
@@ -71,14 +76,11 @@ static TxdWriter BuildNativeTexture(const std::string& texName, int width, int h
     TxdWriter native;
     TxdWriter nativeStruct;
 
-    uint32_t platformId = (platform == 1) ? 8 : 9; // 9 = PC (Direct3D 8/9), 8 = Mobile/OpenGL
+    uint32_t platformId = (platform == 1) ? 8 : 9;
     nativeStruct.Write<uint32_t>(platformId);
-
-    // Filter & addressing
-    nativeStruct.Write<uint16_t>(0x1106); // Wrap UV, Linear filter
+    nativeStruct.Write<uint16_t>(0x1106);
     nativeStruct.Write<uint16_t>(0);
 
-    // Имена
     char nameBuf[32];
     char maskBuf[32];
     std::memset(nameBuf, 0, 32);
@@ -87,43 +89,40 @@ static TxdWriter BuildNativeTexture(const std::string& texName, int width, int h
     nativeStruct.WriteBytes(nameBuf, 32);
     nativeStruct.WriteBytes(maskBuf, 32);
 
-    // Raster Format (0x1500: 8888 32-bit BGRA / RGBA)
-    nativeStruct.Write<uint32_t>(0x1500); // 32-bit raster
-    nativeStruct.Write<uint32_t>(0);      // hasAlpha
+    nativeStruct.Write<uint32_t>(0x1500);
+    nativeStruct.Write<uint32_t>(0);
     nativeStruct.Write<uint16_t>(static_cast<uint16_t>(width));
     nativeStruct.Write<uint16_t>(static_cast<uint16_t>(height));
-    nativeStruct.Write<uint8_t>(32);      // Depth
-    nativeStruct.Write<uint8_t>(1);       // Num Mipmaps
-    nativeStruct.Write<uint8_t>(4);       // Raster Type
-    nativeStruct.Write<uint8_t>(0);       // Compression (None)
+    nativeStruct.Write<uint8_t>(32);
+    nativeStruct.Write<uint8_t>(1);
+    nativeStruct.Write<uint8_t>(4);
+    nativeStruct.Write<uint8_t>(0);
 
     uint32_t dataSize = width * height * 4;
     nativeStruct.Write<uint32_t>(dataSize);
 
-    // Генериране на самите пиксели
     std::vector<uint32_t> pixels;
     GenerateTexturePixels(texName, width, height, pixels);
     nativeStruct.WriteBytes(pixels.data(), dataSize);
 
     native.EmbedChunk(rwID_STRUCT, nativeStruct);
     native.WriteEmptyExtension();
-
     return native;
 }
 
 bool ExportSharedTxd(const std::string& outPath, int platform) {
     TxdWriter txd;
 
-    // 1. TXD Struct
     TxdWriter txdStruct;
-    txdStruct.Write<uint16_t>(3); // 3 текстури в речника
+    txdStruct.Write<uint16_t>(5); // 5 текстури
     txdStruct.Write<uint16_t>(0);
     txd.EmbedChunk(rwID_STRUCT, txdStruct);
 
-    // 2. Вграждане на 3-те Native Текстури
     txd.EmbedChunk(rwID_TEXNATIVE, BuildNativeTexture("osm_wall", 64, 64, platform));
     txd.EmbedChunk(rwID_TEXNATIVE, BuildNativeTexture("osm_roof", 64, 64, platform));
     txd.EmbedChunk(rwID_TEXNATIVE, BuildNativeTexture("osm_road", 64, 64, platform));
+    txd.EmbedChunk(rwID_TEXNATIVE, BuildNativeTexture("osm_grass", 64, 64, platform));
+    txd.EmbedChunk(rwID_TEXNATIVE, BuildNativeTexture("osm_water", 64, 64, platform));
 
     txd.WriteEmptyExtension();
 

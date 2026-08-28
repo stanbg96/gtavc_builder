@@ -2,8 +2,9 @@
 #include <cmath>
 #include <algorithm>
 
-static constexpr float UV_WALL_SCALE = 0.25f; // Повторение на текстурата на всеки 4 метра
+static constexpr float UV_WALL_SCALE = 0.25f;
 static constexpr float UV_ROOF_SCALE = 0.15f;
+static constexpr float UV_TERRAIN_SCALE = 0.10f;
 
 static float CrossProduct2D(const Vector2D& a, const Vector2D& b, const Vector2D& c) {
     return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
@@ -36,7 +37,6 @@ bool GeometryBuilder::TriangulatePolygon(const std::vector<Vector2D>& polygon, s
     if (n < 3) return false;
 
     std::vector<int> V(n);
-    // Проверка за ориентацията (по часовниковата стрелка или обратно)
     float area = 0.0f;
     for (int p = n - 1, q = 0; q < n; p = q++) {
         area += polygon[p].x * polygon[q].y - polygon[q].x * polygon[p].y;
@@ -50,7 +50,7 @@ bool GeometryBuilder::TriangulatePolygon(const std::vector<Vector2D>& polygon, s
 
     int count = 2 * n;
     for (int v = n - 1; n > 2;) {
-        if (count-- <= 0) return false; // Защита от безкраен цикъл
+        if (count-- <= 0) return false;
 
         int u = v;
         if (n <= u) u = 0;
@@ -79,7 +79,6 @@ void GeometryBuilder::ExtrudeBuilding(const BuildingData& bldg, ChunkMesh& mesh)
     size_t pts = poly.size();
     if (pts < 3) return;
 
-    // 1. Изграждане на стените
     float totalDist = 0.0f;
     for (size_t i = 0; i < pts; ++i) {
         size_t next = (i + 1) % pts;
@@ -91,7 +90,6 @@ void GeometryBuilder::ExtrudeBuilding(const BuildingData& bldg, ChunkMesh& mesh)
         float segLen = std::sqrt(dx * dx + dy * dy);
         if (segLen < 0.001f) continue;
 
-        // Изчисляване на 2D нормала за стената
         float nx = -dy / segLen;
         float ny = dx / segLen;
 
@@ -102,7 +100,6 @@ void GeometryBuilder::ExtrudeBuilding(const BuildingData& bldg, ChunkMesh& mesh)
         float vBottom = 0.0f;
         float vTop = bldg.height * UV_WALL_SCALE;
 
-        // 4 върха на правоъгълната стена
         Vertex3D v0 = {p1.x, p1.y, 0.0f, nx, ny, 0.0f, 0xFFFFFFFF, u1, vBottom};
         Vertex3D v1 = {p2.x, p2.y, 0.0f, nx, ny, 0.0f, 0xFFFFFFFF, u2, vBottom};
         Vertex3D v2 = {p2.x, p2.y, bldg.height, nx, ny, 0.0f, 0xFFFFFFFF, u2, vTop};
@@ -113,14 +110,12 @@ void GeometryBuilder::ExtrudeBuilding(const BuildingData& bldg, ChunkMesh& mesh)
         mesh.vertices.push_back(v2);
         mesh.vertices.push_back(v3);
 
-        // 2 триъгълника за квада на стената
         mesh.triangles.push_back({baseIdx, static_cast<uint16_t>(baseIdx + 1), static_cast<uint16_t>(baseIdx + 2), 0});
         mesh.triangles.push_back({baseIdx, static_cast<uint16_t>(baseIdx + 2), static_cast<uint16_t>(baseIdx + 3), 0});
 
         totalDist += segLen;
     }
 
-    // 2. Изграждане на покрива (Triangulation)
     TriangulateRoof(poly, bldg.height, mesh);
 }
 
@@ -138,7 +133,7 @@ void GeometryBuilder::TriangulateRoof(const std::vector<Vector2D>& poly, float h
         v.nx = 0.0f;
         v.ny = 0.0f;
         v.nz = 1.0f;
-        v.color = 0xFFCCCCCC; // Леко затъмнен покрив
+        v.color = 0xFFCCCCCC;
         v.u = pt.x * UV_ROOF_SCALE;
         v.v = pt.y * UV_ROOF_SCALE;
         mesh.vertices.push_back(v);
@@ -174,7 +169,6 @@ void GeometryBuilder::GenerateRoad(const RoadSegment& road, ChunkMesh& mesh) {
         float ny = dx / len * halfWidth;
 
         uint16_t baseIdx = static_cast<uint16_t>(mesh.vertices.size());
-
         float nextU = currentU + len * 0.1f;
 
         Vertex3D v0 = {p1.x - nx, p1.y - ny, 0.05f, 0.0f, 0.0f, 1.0f, 0xFFFFFFFF, 0.0f, currentU};
@@ -191,6 +185,38 @@ void GeometryBuilder::GenerateRoad(const RoadSegment& road, ChunkMesh& mesh) {
         mesh.triangles.push_back({baseIdx, static_cast<uint16_t>(baseIdx + 2), static_cast<uint16_t>(baseIdx + 3), 2});
 
         currentU = nextU;
+    }
+}
+
+void GeometryBuilder::GenerateTerrain(const TerrainPolygon& terr, ChunkMesh& mesh) {
+    std::vector<int> indices;
+    if (!TriangulatePolygon(terr.points, indices)) return;
+
+    uint16_t baseIdx = static_cast<uint16_t>(mesh.vertices.size());
+    float zHeight = (terr.terrainType == "water") ? -0.3f : 0.01f;
+    uint16_t matId = (terr.terrainType == "water") ? 4 : 3; // 4 = Water, 3 = Grass
+
+    for (const auto& pt : terr.points) {
+        Vertex3D v;
+        v.x = pt.x;
+        v.y = pt.y;
+        v.z = zHeight;
+        v.nx = 0.0f;
+        v.ny = 0.0f;
+        v.nz = 1.0f;
+        v.color = 0xFFFFFFFF;
+        v.u = pt.x * UV_TERRAIN_SCALE;
+        v.v = pt.y * UV_TERRAIN_SCALE;
+        mesh.vertices.push_back(v);
+    }
+
+    for (size_t i = 0; i < indices.size(); i += 3) {
+        TriangleFace tri;
+        tri.a = static_cast<uint16_t>(baseIdx + indices[i]);
+        tri.b = static_cast<uint16_t>(baseIdx + indices[i + 1]);
+        tri.c = static_cast<uint16_t>(baseIdx + indices[i + 2]);
+        tri.materialId = matId;
+        mesh.triangles.push_back(tri);
     }
 }
 
@@ -232,6 +258,9 @@ ChunkMesh GeometryBuilder::BuildMesh(const MapChunk& chunk) {
     }
     for (const auto& road : chunk.roads) {
         GenerateRoad(road, mesh);
+    }
+    for (const auto& terr : chunk.terrain) {
+        GenerateTerrain(terr, mesh);
     }
     ComputeBounds(mesh);
     return mesh;

@@ -32,12 +32,19 @@ struct RoadSegment {
     std::string highwayType = "residential";
 };
 
+struct TerrainPolygon {
+    int64_t id = 0;
+    std::vector<Vector2D> points;
+    std::string terrainType; // "grass", "water"
+};
+
 struct MapChunk {
     int chunkX = 0;
     int chunkY = 0;
     std::string chunkName;
     std::vector<BuildingData> buildings;
     std::vector<RoadSegment> roads;
+    std::vector<TerrainPolygon> terrain;
 };
 
 class OsmParser {
@@ -61,10 +68,10 @@ private:
     double origin_lon_ = 0.0;
     bool has_origin_ = false;
 
-    // Временна памет за референтните възли
     std::unordered_map<int64_t, Vector2D> node_lookup_;
     std::vector<BuildingData> parsed_buildings_;
     std::vector<RoadSegment> parsed_roads_;
+    std::vector<TerrainPolygon> parsed_terrain_;
     std::vector<MapChunk> chunks_;
     size_t total_buildings_ = 0;
 };
