@@ -271,7 +271,6 @@ class _MapScreenState extends State<MapScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Компактна Карта
             Container(
               height: 180,
               decoration: BoxDecoration(
@@ -313,7 +312,6 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 10),
 
-            // Режим на текстуриране
             Row(
               children: [
                 Expanded(
@@ -343,7 +341,6 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Избор на кола
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
               decoration: BoxDecoration(
@@ -364,7 +361,7 @@ class _MapScreenState extends State<MapScreen> {
                           value: e.key,
                           child: Text(e.value, style: const TextStyle(fontSize: 12, color: Color(0xFF00F0FF))),
                         );
-                      }).toList>,
+                      }).toList(),
                       onChanged: _isProcessing ? null : (val) {
                         if (val != null) setState(() => _selectedVehicleId = val);
                       },
@@ -375,7 +372,6 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 4),
 
-            // Лампи и дървета
             SwitchListTile(
               dense: true,
               contentPadding: EdgeInsets.zero,
@@ -385,7 +381,6 @@ class _MapScreenState extends State<MapScreen> {
               onChanged: _isProcessing ? null : (val) => setState(() => _enableProps = val),
             ),
 
-            // Координати (Компактна решетка)
             Row(
               children: [
                 Expanded(
@@ -435,7 +430,6 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 10),
 
-            // Прогрес бар
             if (_isProcessing) ...[
               LinearProgressIndicator(
                 value: _progress > 0 ? _progress : null,
@@ -445,7 +439,6 @@ class _MapScreenState extends State<MapScreen> {
               const SizedBox(height: 6),
             ],
 
-            // Статус и Бутони за копиране / инструкции
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -502,7 +495,6 @@ class _MapScreenState extends State<MapScreen> {
           ],
         ),
       ),
-      // Закован постоянен бутон най-долу на екрана
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(12),
         decoration: const BoxDecoration(
