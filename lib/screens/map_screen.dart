@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
@@ -28,6 +29,7 @@ class _MapScreenState extends State<MapScreen> {
   bool _isProcessing = false;
   double _progress = 0.0;
   String _statusMessage = 'Изберете зона и натиснете "Генерирай GTA VC Файлове"';
+  String? _publicExportPath;
 
   @override
   void dispose() {
@@ -63,7 +65,7 @@ class _MapScreenState extends State<MapScreen> {
 
     if ((maxLat - minLat).abs() > 0.05 || (maxLon - minLon).abs() > 0.05) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Зоната е твърде голяма! Моля, изберете по-малък регион.')),
+        const SnackBar(content: Text('Зоната е твърде голяма! Изберете по-малък квартал.')),
       );
       return;
     }
@@ -71,10 +73,12 @@ class _MapScreenState extends State<MapScreen> {
     setState(() {
       _isProcessing = true;
       _progress = 0.0;
+      _publicExportPath = null;
       _statusMessage = 'Започване на процеса...';
     });
 
     try {
+      // 1. Сваляне на OSM
       final osmFile = await OsmService.downloadOsmArea(
         minLat: minLat,
         minLon: minLon,
@@ -88,38 +92,70 @@ class _MapScreenState extends State<MapScreen> {
         },
       );
 
+      // 2. Създаване на работна папка
       final appDir = await getApplicationDocumentsDirectory();
-      final outDir = Directory('${appDir.path}/GTA_VC_OUTPUT_${DateTime.now().millisecondsSinceEpoch}');
-      if (!await outDir.exists()) {
-        await outDir.create(recursive: true);
+      final folderName = 'GTA_VC_MAP_${DateTime.now().millisecondsSinceEpoch}';
+      final internalOutDir = Directory('${appDir.path}/$folderName');
+      if (!await internalOutDir.exists()) {
+        await internalOutDir.create(recursive: true);
       }
 
       setState(() {
         _statusMessage = 'C++ Енджинът генерира 3D геометрия (.dff, .txd, .col)...';
       });
 
+      // 3. Извикване на C++ NDK ядрото
       final native = NativeBridge();
       final success = await native.convertOsmToGta(
         osmFilePath: osmFile.path,
-        outputDirPath: outDir.path,
+        outputDirPath: internalOutDir.path,
         platform: _selectedPlatform,
         onProgress: (nativeProg) {
           setState(() {
-            _progress = 0.5 + (nativeProg * 0.5);
+            _progress = 0.5 + (nativeProg * 0.4);
             _statusMessage = 'C++ Обработка: ${(nativeProg * 100).toInt()}%';
           });
         },
       );
 
-      if (success) {
-        setState(() {
-          _progress = 1.0;
-          _statusMessage = 'Успешно завършено!\nФайловете са запазени в:\n${outDir.path}';
-        });
-      } else {
+      if (!success) {
         throw Exception('C++ ядрото върна грешка при обработката!');
       }
 
+      // 4. Автоматично копиране в публичната папка Downloads
+      setState(() {
+        _statusMessage = 'Експортиране на файловете в папка Downloads...';
+      });
+
+      Directory publicDownloadDir = Directory('/storage/emulated/0/Download/GTA_VC_Maps/$folderName');
+      try {
+        if (!await publicDownloadDir.exists()) {
+          await publicDownloadDir.create(recursive: true);
+        }
+      } catch (_) {
+        final extDir = await getExternalStorageDirectory();
+        publicDownloadDir = Directory('${extDir?.path}/GTA_VC_Maps/$folderName');
+        await publicDownloadDir.create(recursive: true);
+      }
+
+      int fileCount = 0;
+      final generatedFiles = internalOutDir.listSync();
+      for (final entity in generatedFiles) {
+        if (entity is File) {
+          final fileName = entity.uri.pathSegments.last;
+          await entity.copy('${publicDownloadDir.path}/$fileName');
+          fileCount++;
+        }
+      }
+
+      _publicExportPath = publicDownloadDir.path;
+
+      setState(() {
+        _progress = 1.0;
+        _statusMessage = ' Готово! Експортирани $fileCount файла в:\n${publicDownloadDir.path}';
+      });
+
+      // Изтриване на временния XML
       if (await osmFile.exists()) {
         await osmFile.delete();
       }
@@ -251,15 +287,40 @@ class _MapScreenState extends State<MapScreen> {
                     const SizedBox(height: 8),
                   ],
                   Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: const Color(0xFF282836),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _publicExportPath != null ? const Color(0xFF00F0FF) : Colors.transparent,
+                      ),
                     ),
-                    child: Text(
-                      _statusMessage,
-                      style: const TextStyle(fontSize: 13, color: Colors.white70),
-                      textAlign: TextAlign.center,
+                    child: Column(
+                      children: [
+                        Text(
+                          _statusMessage,
+                          style: const TextStyle(fontSize: 13, color: Colors.white70),
+                          textAlign: TextAlign.center,
+                        ),
+                        if (_publicExportPath != null) ...[
+                          const SizedBox(height: 8),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: _publicExportPath!));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Пътят до папката е копиран в клипборда!')),
+                              );
+                            },
+                            icon: const Icon(Icons.copy, size: 16),
+                            label: const Text('Копирай пътя към Downloads'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF00F0FF),
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   const SizedBox(height: 12),
