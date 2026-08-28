@@ -116,7 +116,6 @@ void GeometryBuilder::ExtrudeBuilding(const BuildingData& bldg, ChunkMesh& mesh)
         totalDist += segLen;
     }
 
-    // Покрив
     std::vector<int> indices;
     if (TriangulatePolygon(poly, indices)) {
         uint16_t baseIdx = static_cast<uint16_t>(mesh.vertices.size());
@@ -242,5 +241,20 @@ ChunkMesh GeometryBuilder::BuildMesh(const MapChunk& chunk) {
     for (const auto& road : chunk.roads) GenerateRoad(road, mesh);
     for (const auto& terr : chunk.terrain) GenerateTerrain(terr, mesh);
     ComputeBounds(mesh);
+
+    // Центрираме модела около неговия собствен локален център (0, 0)
+    // за да може да се отваря идеално във всички 3D DFF Viewer-и!
+    float cx = mesh.bounds.center.x;
+    float cy = mesh.bounds.center.y;
+
+    for (auto& v : mesh.vertices) {
+        v.x -= cx;
+        v.y -= cy;
+    }
+    mesh.bounds.min.x -= cx; mesh.bounds.max.x -= cx;
+    mesh.bounds.min.y -= cy; mesh.bounds.max.y -= cy;
+    mesh.bounds.center.x = 0.0f;
+    mesh.bounds.center.y = 0.0f;
+
     return mesh;
 }
