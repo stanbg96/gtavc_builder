@@ -6,6 +6,7 @@
 #include <cstring>
 #include <algorithm>
 #include "osm_parser.h"
+#include "sat_vision.h"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -260,7 +261,7 @@ static bool ExportInstallGuide(const std::vector<MapChunk>& chunks, size_t propC
     out << "=================================================================\n";
     out << "   GTA VICE CITY - ИНСТРУКЦИИ ЗА ИНСТАЛИРАНЕ НА КАРТАТА         \n";
     out << "=================================================================\n\n";
-    out << "• Режим на текстуриране: " << (texturingMode == 0 ? "AI Сателитен Анализ (Real Imagery)" : "32 Процедурни Материала") << "\n";
+    out << "• Режим на текстуриране: " << (texturingMode == 0 ? "AI Computer Vision (Сателитен Анализ)" : "32 Процедурни Материала") << "\n";
     out << "• 3D Квартали: " << chunks.size() << "\n";
     out << "• Улични лампи и палми: " << propCount << "\n";
     out << "• Паркирани автомобили: " << carCount << "\n\n";
@@ -299,7 +300,16 @@ int ProcessOsmData(const char* osmPath, const char* outDir, const char* satImage
         return -2;
     }
 
-    const auto& chunks = parser.GetChunks();
+    auto& chunks = const_cast<std::vector<MapChunk>&>(parser.GetChunks());
+
+    // Изпълнение на AI Computer Vision върху сателитната снимка
+    if (texturingMode == 0 && !satPath.empty()) {
+        LOGI("Изпълнява се Computer Vision пикселен анализ на сградите...");
+        for (auto& chunk : chunks) {
+            SatVision::AnalyzeBuildings(satPath, chunk.buildings);
+        }
+    }
+
     std::string txdPath = outputDirectory + "/osm_world.txd";
     ExportSharedTxd(txdPath, targetPlatform);
 

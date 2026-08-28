@@ -15,6 +15,7 @@ include_directories(
 set(SOURCES
     src/main.cpp
     src/osm_parser.cpp
+    src/sat_vision.cpp
     src/geometry_builder.cpp
     src/dff_builder.cpp
     src/col_builder.cpp
