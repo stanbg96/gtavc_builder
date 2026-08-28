@@ -64,9 +64,9 @@ class NativeBridge {
     final osmPathPtr = osmFilePath.toNativeUtf8();
     final outDirPtr = outputDirPath.toNativeUtf8();
 
-    final nativeCallable = NativeCallable<Void Function(Float)>.isolateLocal(
+    // Listener е нишково-защитен за void callbacks
+    final nativeCallable = NativeCallable<Void Function(Float)>.listener(
       _nativeCallback,
-      exceptionalReturn: null,
     );
 
     try {
